@@ -365,7 +365,7 @@
 
     let text = '1';
     groupTerms.forEach(group => {
-      const sign = (group.size % 2 === 1) ? '−' : '+';
+      const sign = (group.size % 2 === 1) ? '-' : '+';
       const productStrings = group.items.map(idxArr => idxArr.map(i => labels[i]).join('·'));
       text += ` ${sign} (${productStrings.join(' + ')})`;
     });
@@ -389,13 +389,13 @@
       html += `<div class="result-line">No existe un trayecto directo entre ${source} y ${sink}.</div>`;
     }
     paths.forEach((p, i) => {
-      html += `<div class="result-line"><span class="tag">${pathLabels[i]}</span>${p.nodes.join(' → ')} &nbsp; ganancia = ${p.gain}</div>`;
+      html += `<div class="result-line"><span class="tag">${pathLabels[i]}</span>${p.nodes.join(' → ')} &nbsp; ganancia = <span class="kx">${p.gain}</span></div>`;
     });
     html += `</div>`;
 
     html += `<div class="result-block"><h3>Lazos individuales (${loops.length})</h3>`;
     loops.forEach((l, i) => {
-      html += `<div class="result-line"><span class="tag">${loopLabels[i]}</span>${l.nodes.join(' → ')} → ${l.nodes[0]} &nbsp; ganancia = ${l.gain}</div>`;
+      html += `<div class="result-line"><span class="tag">${loopLabels[i]}</span>${l.nodes.join(' → ')} → ${l.nodes[0]} &nbsp; ganancia = <span class="kx">${l.gain}</span></div>`;
     });
     if (loops.length === 0) html += `<div class="result-line">Este diagrama no tiene lazos.</div>`;
     html += `</div>`;
@@ -408,37 +408,49 @@
     Object.keys(combosBySize).sort((a, b) => a - b).forEach(sizeStr => {
       const nameBySize = { 2: 'pares', 3: 'tríos', 4: 'cuartetos' };
       const label = nameBySize[sizeStr] || (sizeStr + '-tuplas');
-      const items = combosBySize[sizeStr].map(idxArr => idxArr.map(i => loopLabels[i]).join('·'));
+      const items = combosBySize[sizeStr].map(idxArr =>
+        `<span class="kx">${idxArr.map(i => loopLabels[i]).join('·')}</span>`);
       html += `<div class="result-line"><span class="tag">${label}</span>${items.join(',  ')}</div>`;
     });
     html += `</div>`;
 
     const delta = buildDelta(loops, loopLabels);
-    html += `<div class="result-block"><h3>Determinante Δ</h3><div class="result-line">Δ = ${delta.text}</div></div>`;
+    html += `<div class="result-block"><h3>Determinante Δ</h3>
+      <div class="result-line">Δ = <span class="kx">${delta.text}</span></div></div>`;
 
     html += `<div class="result-block"><h3>Cofactores Δₖ</h3>`;
-    const pathDeltas = paths.map((p, i) => {
+    paths.forEach((p, i) => {
       const filteredIdx = loops.map((l, li) => li).filter(li => disjoint(loops[li].nodeSet, p.nodeSet));
       const filteredLoops = filteredIdx.map(li => loops[li]);
       const filteredLabels = filteredIdx.map(li => loopLabels[li]);
       const d = buildDelta(filteredLoops, filteredLabels);
-      html += `<div class="result-line"><span class="tag">Δ${i + 1}</span>= ${d.text}</div>`;
-      return d.text;
+      html += `<div class="result-line"><span class="tag">Δ${i + 1}</span>= <span class="kx">${d.text}</span></div>`;
     });
     html += `</div>`;
 
     if (paths.length > 0) {
-      const numerator = paths.map((p, i) => `${pathLabels[i]}·Δ${i + 1}`).join(' + ');
       html += `<div class="result-block"><h3>Función de transferencia</h3>
-        <div class="final-tf">T(s) = (${numerator}) / Δ</div>
+        <div class="final-tf" id="mason-final-tf"></div>
         <p class="hint" style="margin-top:8px">
-          donde ${pathLabels.map((pl, i) => `${pl} = ${paths[i].gain}`).join(',  ')}
-          ${loopLabels.length ? ' y ' + loopLabels.map((ll, i) => `${ll} = ${loops[i].gain}`).join(',  ') : ''}.
+          donde ${pathLabels.map((pl, i) => `<span class="kx">${pl}=${paths[i].gain}</span>`).join(',  ')}
+          ${loopLabels.length ? ' y ' + loopLabels.map((ll, i) => `<span class="kx">${ll}=${loops[i].gain}</span>`).join(',  ') : ''}.
         </p>
       </div>`;
     }
 
     resultsEl.innerHTML = html;
+
+    // Render de todos los fragmentos matemáticos (líneas inline)
+    resultsEl.querySelectorAll('.kx').forEach(span => {
+      MathFmt.render(span, MathFmt.texSym(span.textContent), false);
+    });
+
+    // Render de la fracción final T(s) en modo display, con numerador/denominador propios
+    if (paths.length > 0) {
+      const numTex = paths.map((p, i) => `${MathFmt.texSym(pathLabels[i])}\\cdot ${MathFmt.texSym('Δ' + (i + 1))}`).join(' + ');
+      const finalTex = `T(s)=\\dfrac{${numTex}}{\\Delta}`;
+      MathFmt.render(document.getElementById('mason-final-tf'), finalTex, true);
+    }
   }
 
   computeBtn.addEventListener('click', computeMason);
