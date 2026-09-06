@@ -290,13 +290,6 @@
     });
   });
 
-  el('so-step-zoom-in').addEventListener('click', () => stepPlot.zoomBy(1.35));
-  el('so-step-zoom-out').addEventListener('click', () => stepPlot.zoomBy(1 / 1.35));
-  el('so-step-zoom-reset').addEventListener('click', () => stepPlot.resetZoom());
-  el('so-pz-zoom-in').addEventListener('click', () => pzPlot.zoomBy(1.35));
-  el('so-pz-zoom-out').addEventListener('click', () => pzPlot.zoomBy(1 / 1.35));
-  el('so-pz-zoom-reset').addEventListener('click', () => pzPlot.resetZoom());
-
   window.addEventListener('DOMContentLoaded', render);
   window.__soRender = render;
 })();
