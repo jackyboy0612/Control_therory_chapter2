@@ -1,5 +1,5 @@
 /* plot.js — pequeño helper de trazado en <canvas> con sistema de coordenadas cartesiano.
-   Incluye zoom (rueda del mouse o botones) y arrastre (pan). Sin librerías externas. */
+   Sin zoom/pan (se quitó a pedido): vista fija, recalculada en cada render(). */
 
 class CartesianPlot {
   constructor(canvas, opts = {}) {
@@ -15,18 +15,9 @@ class CartesianPlot {
       rose: '#E8607A',
       dim: 'rgba(156,163,204,0.35)'
     };
-    this.zoom = 1;
-    this.panX = 0;
-    this.panY = 0;
-    this._natural = null;
-    this._dragging = false;
-    this._dragMoved = false;
-    this._dragStart = null;
-
     this._resizeObserver = new ResizeObserver(() => this._fitDPR());
     this._resizeObserver.observe(canvas);
     this._fitDPR();
-    this._setupZoomPan();
   }
 
   _fitDPR() {
@@ -41,76 +32,8 @@ class CartesianPlot {
     if (this._lastDraw) this._lastDraw();
   }
 
-  // set data-space bounds "naturales" (antes de aplicar zoom/pan)
   setBounds(xmin, xmax, ymin, ymax) {
-    this._natural = { xmin, xmax, ymin, ymax };
-    this._applyZoomPan();
-  }
-
-  _applyZoomPan() {
-    if (!this._natural) return;
-    const { xmin, xmax, ymin, ymax } = this._natural;
-    const cx = (xmin + xmax) / 2 + this.panX;
-    const cy = (ymin + ymax) / 2 + this.panY;
-    const hw = (xmax - xmin) / 2 / this.zoom;
-    const hh = (ymax - ymin) / 2 / this.zoom;
-    this.xmin = cx - hw; this.xmax = cx + hw;
-    this.ymin = cy - hh; this.ymax = cy + hh;
-  }
-
-  zoomBy(factor, pivotPx) {
-    if (!this._natural) return;
-    let dataBefore = null;
-    if (pivotPx) dataBefore = this.toData(pivotPx.x, pivotPx.y);
-    this.zoom = Math.min(Math.max(this.zoom * factor, 0.25), 25);
-    this._applyZoomPan();
-    if (pivotPx) {
-      const dataAfter = this.toData(pivotPx.x, pivotPx.y);
-      this.panX += (dataBefore[0] - dataAfter[0]);
-      this.panY += (dataBefore[1] - dataAfter[1]);
-      this._applyZoomPan();
-    }
-    if (this._lastDraw) this._lastDraw();
-  }
-
-  resetZoom() {
-    this.zoom = 1; this.panX = 0; this.panY = 0;
-    this._applyZoomPan();
-    if (this._lastDraw) this._lastDraw();
-  }
-
-  _setupZoomPan() {
-    this.canvas.addEventListener('wheel', (e) => {
-      e.preventDefault();
-      const rect = this.canvas.getBoundingClientRect();
-      const px = e.clientX - rect.left, py = e.clientY - rect.top;
-      const factor = e.deltaY < 0 ? 1.18 : 1 / 1.18;
-      this.zoomBy(factor, { x: px, y: py });
-    }, { passive: false });
-
-    this.canvas.addEventListener('pointerdown', (e) => {
-      this._dragging = true;
-      this._dragMoved = false;
-      this._dragStart = { x: e.clientX, y: e.clientY, panX: this.panX, panY: this.panY };
-      this.canvas.style.cursor = 'grabbing';
-    });
-    window.addEventListener('pointermove', (e) => {
-      if (!this._dragging) return;
-      const dx = e.clientX - this._dragStart.x, dy = e.clientY - this._dragStart.y;
-      if (Math.hypot(dx, dy) > 4) this._dragMoved = true;
-      if (!this._dragMoved) return;
-      const rect = this.canvas.getBoundingClientRect();
-      const scaleX = (this.xmax - this.xmin) / rect.width;
-      const scaleY = (this.ymax - this.ymin) / rect.height;
-      this.panX = this._dragStart.panX - dx * scaleX;
-      this.panY = this._dragStart.panY + dy * scaleY;
-      this._applyZoomPan();
-      if (this._lastDraw) this._lastDraw();
-    });
-    window.addEventListener('pointerup', () => {
-      this._dragging = false;
-      this.canvas.style.cursor = '';
-    });
+    this.xmin = xmin; this.xmax = xmax; this.ymin = ymin; this.ymax = ymax;
   }
 
   toPx(x, y) {
@@ -141,7 +64,6 @@ class CartesianPlot {
     ctx.strokeStyle = this.colors.axis;
     ctx.lineWidth = 1;
 
-    // zero lines si están en el rango
     if (this.xmin < 0 && this.xmax > 0) {
       const [px0] = this.toPx(0, 0);
       ctx.beginPath();
@@ -157,13 +79,11 @@ class CartesianPlot {
       ctx.stroke();
     }
 
-    // caja del área de trazado
     ctx.strokeStyle = 'rgba(146,163,224,0.35)';
     ctx.strokeRect(this.padding.left, this.padding.top,
       this.w - this.padding.left - this.padding.right,
       this.h - this.padding.top - this.padding.bottom);
 
-    // marcas (ticks)
     const nTicksX = 6, nTicksY = 5;
     ctx.font = '12px "IBM Plex Mono", monospace';
     ctx.fillStyle = this.colors.axisLabel;
@@ -180,14 +100,12 @@ class CartesianPlot {
       ctx.fillText(this._fmtTick(yv), this.padding.left - 10, py + 4);
     }
 
-    // título del eje X: centrado bajo los números, con separación clara
     ctx.textAlign = 'center';
     ctx.font = '600 13px "IBM Plex Sans", sans-serif';
     ctx.fillStyle = this.colors.axisTitle;
     const xTitleX = this.padding.left + (this.w - this.padding.left - this.padding.right) / 2;
     ctx.fillText(xLabel, xTitleX, this.h - 6);
 
-    // título del eje Y: rotado -90°, centrado verticalmente, separado de los números de las marcas
     ctx.save();
     ctx.translate(16, this.padding.top + (this.h - this.padding.top - this.padding.bottom) / 2);
     ctx.rotate(-Math.PI / 2);
@@ -263,7 +181,6 @@ class CartesianPlot {
 
   onClick(cb) {
     this.canvas.addEventListener('click', (e) => {
-      if (this._dragMoved) { this._dragMoved = false; return; }
       const rect = this.canvas.getBoundingClientRect();
       const px = e.clientX - rect.left;
       const py = e.clientY - rect.top;
