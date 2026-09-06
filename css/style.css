@@ -205,7 +205,10 @@ main{ max-width: 1280px; margin: 0 auto; padding: 0 28px 60px; }
   padding: 12px 14px;
 }
 .equation-title{ font-size: 11px; color: var(--ink-faint); margin-bottom: 6px; }
-.equation{ font-size: 14.5px; color: var(--cyan); word-break: break-word; }
+.equation{ font-size: 15px; color: var(--cyan); overflow-x: auto; overflow-y: hidden; padding-bottom: 2px; }
+.equation .katex{ color: inherit; }
+.equation .katex-display{ margin: 0; }
+.equation:empty::before{ content: "—"; color: var(--ink-faint); font-family: var(--mono); font-size: 13px; }
 
 .toggles{ gap: 10px; }
 .check{
@@ -342,17 +345,20 @@ main{ max-width: 1280px; margin: 0 auto; padding: 0 28px 60px; }
 }
 .result-block{ border-top: 1px solid var(--border-soft); padding-top: 12px; }
 .result-block:first-child{ border-top:none; padding-top:0; }
-.result-line{ font-family: var(--mono); font-size: 12.8px; color: var(--ink); line-height:1.8; word-break: break-word; }
+.result-line{ font-family: var(--mono); font-size: 12.8px; color: var(--ink); line-height:2.1; word-break: break-word; }
 .result-line .tag{ color: var(--cyan); margin-right: 6px; }
+.result-line .kx{ color: inherit; }
 .final-tf{
-  font-family: var(--mono);
-  font-size: 16px;
+  font-size: 17px;
   color: var(--amber);
   border-left: 3px solid var(--amber);
-  padding: 10px 14px;
+  padding: 12px 14px;
   background: var(--panel-alt);
   border-radius: var(--radius);
+  overflow-x: auto;
 }
+.result-line .katex, .final-tf .katex{ color: inherit; }
+.final-tf .katex-display{ margin: 0; }
 
 /* ============ FOOTER ============ */
 .foot{
