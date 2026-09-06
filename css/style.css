@@ -303,6 +303,29 @@ main{ max-width: 1280px; margin: 0 auto; padding: 0 28px 60px; }
 .legend-dot{ display:inline-block; width:9px; height:9px; border-radius:50%; margin-right:5px; vertical-align:middle; }
 .legend-dot.amber{ background: var(--amber); }
 .legend-dot.cyan{ background: var(--cyan); }
+.legend-dot.rose{ background: var(--rose); }
+
+.zoom-bar{
+  display:flex; align-items:center; gap:6px;
+  padding: 8px 16px;
+  border-bottom: 1px solid var(--border-soft);
+  background: var(--panel-alt);
+}
+.zoom-btn{
+  background: var(--panel);
+  border: 1px solid var(--border);
+  color: var(--ink);
+  font-family: var(--mono);
+  font-size: 12px;
+  width: 30px; height: 26px;
+  border-radius: var(--radius);
+  cursor: pointer;
+  display:flex; align-items:center; justify-content:center;
+}
+.zoom-btn:hover{ border-color: var(--amber); color: var(--amber); }
+#lin-zoom-reset, #so-step-zoom-reset, #so-pz-zoom-reset{ width: auto; padding: 0 8px; }
+.zoom-hint{ font-size: 11px; color: var(--ink-faint); margin-left: 8px; }
+@media (max-width: 640px){ .zoom-hint{ display:none; } }
 
 .scope-canvas{
   display:block;
@@ -324,6 +347,10 @@ main{ max-width: 1280px; margin: 0 auto; padding: 0 28px 60px; }
     linear-gradient(90deg, var(--grid-line) 1px, transparent 1px) 0 0/40px 40px,
     #10142E;
   cursor: crosshair;
+}
+.scope-svg.bd{
+  height: 220px;
+  cursor: default;
 }
 
 .results-panel{
