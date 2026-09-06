@@ -51,7 +51,8 @@
       <div class="control-group">
         <label class="control-label">Sistema</label>
         <select id="lin-preset" class="dial-select">
-          <option value="taylor">Ejemplo 3.2 — ẋ = x·√(x²+5x)</option>
+          <option value="eq1a">Ejercicio 1a — ẋ = −x + 2√x + u (ū=0)</option>
+          <option value="bistable">Sistema biestable — ẋ = x − x³ (3 equilibrios)</option>
           <option value="reactor">Reactor CSTR — ẋ = −k·x² + (u/V)(c−x)</option>
           <option value="tank">Tanque por gravedad — ḣ = (q − c√h)/A</option>
           <option value="custom">Función personalizada f(x, u)</option>
@@ -66,11 +67,11 @@
 
       <div class="control-group">
         <div class="control-label-row">
-          <label class="control-label">Punto de operación x̄</label>
+          <label class="control-label">Punto de equilibrio x̄</label>
           <span class="readout mono" id="lin-xbar-readout">5.00</span>
         </div>
-        <input id="lin-xbar" type="range" min="-2" max="12" step="0.05" value="5" class="slider">
-        <p class="hint">También puedes hacer clic directamente sobre la curva.</p>
+        <select id="lin-equilibria" class="dial-select"></select>
+        <p class="hint">Solo se puede linealizar <strong>en los puntos de equilibrio</strong> (donde f(x̄, ū) = 0). Se recalculan automáticamente al cambiar u. También puedes hacer clic sobre uno de los marcadores ⊙ de la curva.</p>
       </div>
 
       <div class="control-group" id="lin-u-wrap">
@@ -93,6 +94,7 @@
         <div class="readout-row"><span>∂f/∂x |x̄</span><span class="mono" id="lin-dfdx">—</span></div>
         <div class="readout-row"><span>∂f/∂u |x̄</span><span class="mono" id="lin-dfdu">—</span></div>
         <div class="readout-row"><span>f(x̄)</span><span class="mono" id="lin-fxbar">—</span></div>
+        <div class="readout-row"><span>Estabilidad local</span><span class="mono" id="lin-stability">—</span></div>
         <div class="readout-row"><span>Error relativo máx. en la ventana</span><span class="mono" id="lin-error">—</span></div>
       </div>
 
@@ -110,6 +112,12 @@
             <span class="legend-dot amber"></span> f(x)
             <span class="legend-dot cyan"></span> Tangente en x̄
           </span>
+        </div>
+        <div class="zoom-bar">
+          <button class="zoom-btn" id="lin-zoom-out" title="Alejar">−</button>
+          <button class="zoom-btn" id="lin-zoom-reset" title="Restablecer zoom">100%</button>
+          <button class="zoom-btn" id="lin-zoom-in" title="Acercar">+</button>
+          <span class="zoom-hint">Rueda del mouse o arrastra para explorar</span>
         </div>
         <canvas id="lin-canvas" class="scope-canvas"></canvas>
       </div>
@@ -189,12 +197,34 @@
       <div class="scope">
         <div class="scope-head">
           <span class="scope-title">Respuesta a escalón unitario y(t)</span>
+          <span class="scope-legend">
+            <span class="legend-dot amber"></span> y(t)
+            <span class="legend-dot cyan"></span> Envolvente
+            <span class="legend-dot rose"></span> t_p
+          </span>
+        </div>
+        <div class="zoom-bar">
+          <button class="zoom-btn" id="so-step-zoom-out" title="Alejar">−</button>
+          <button class="zoom-btn" id="so-step-zoom-reset" title="Restablecer zoom">100%</button>
+          <button class="zoom-btn" id="so-step-zoom-in" title="Acercar">+</button>
+          <span class="zoom-hint">Rueda del mouse o arrastra para explorar</span>
         </div>
         <canvas id="so-step-canvas" class="scope-canvas"></canvas>
       </div>
       <div class="scope">
         <div class="scope-head">
           <span class="scope-title">Plano-s — ubicación de los polos</span>
+          <span class="scope-legend">
+            <span class="legend-dot amber"></span> Polos
+            <span class="legend-dot cyan"></span> ωₙ, ζ
+            <span class="legend-dot rose"></span> tₛ
+          </span>
+        </div>
+        <div class="zoom-bar">
+          <button class="zoom-btn" id="so-pz-zoom-out" title="Alejar">−</button>
+          <button class="zoom-btn" id="so-pz-zoom-reset" title="Restablecer zoom">100%</button>
+          <button class="zoom-btn" id="so-pz-zoom-in" title="Acercar">+</button>
+          <span class="zoom-hint">Rueda del mouse o arrastra para explorar</span>
         </div>
         <canvas id="so-pz-canvas" class="scope-canvas short"></canvas>
       </div>
@@ -210,9 +240,10 @@
 <section id="panel-mason" class="panel">
   <div class="panel-head">
     <h1>Diagramas de bloques y ley de Mason</h1>
-    <p class="lede">Construye un diagrama de flujo de señal: agrega nodos, conéctalos con ramas etiquetadas por su ganancia
-    (p. ej. <span class="mono">G1</span> o <span class="mono">-H1</span>), define el nodo de entrada y el de salida, y
-    calcula automáticamente trayectos directos, lazos, lazos disjuntos y la función de transferencia por la fórmula de Mason.</p>
+    <p class="lede">Un diagrama en bloques (rectángulos con la función de transferencia, sumadores y puntos de bifurcación)
+    se convierte en un <strong>diagrama de flujo de señal</strong> (nodos y ramas con ganancia) para poder aplicar la
+    fórmula de Mason. Abajo puedes ver ambas representaciones para los ejemplos del capítulo, y editar libremente el
+    diagrama de flujo de señal para construir el tuyo.</p>
   </div>
 
   <div class="rack rack-mason">
@@ -220,8 +251,9 @@
       <div class="control-group">
         <label class="control-label">Ejemplos del capítulo</label>
         <div class="preset-row column">
+          <button class="chip-btn wide" id="mason-preset-series">Serie G₁(s)·G₂(s) — Fig. 3.15</button>
+          <button class="chip-btn wide" id="mason-preset-feedback">Retroalimentación G(s), H(s) — Fig. 3.16</button>
           <button class="chip-btn wide" id="mason-preset-fig320">Figura 3.20 — 9 nodos, 4 lazos</button>
-          <button class="chip-btn wide" id="mason-preset-feedback">Retroalimentación simple G(s), H(s)</button>
           <button class="chip-btn wide" id="mason-preset-clear">Vaciar lienzo</button>
         </div>
       </div>
@@ -231,7 +263,7 @@
         <div class="inline-row">
           <button id="mason-add-node-mode" class="tool-btn">Haz clic en el lienzo →</button>
         </div>
-        <p class="hint">Cada clic sobre el lienzo crea un nodo nuevo (N1, N2, …). Arrástralos para reordenar.</p>
+        <p class="hint">Cada clic sobre el lienzo de nodos crea uno nuevo (N1, N2, …). Arrástralos para reordenar.</p>
       </div>
 
       <div class="control-group">
@@ -269,9 +301,15 @@
     </div>
 
     <div class="scope-stack">
+      <div class="scope" id="mason-bd-wrap">
+        <div class="scope-head">
+          <span class="scope-title">Diagrama de bloques equivalente</span>
+        </div>
+        <svg id="mason-bd-svg" class="scope-svg bd" viewBox="0 0 640 260"></svg>
+      </div>
       <div class="scope">
         <div class="scope-head">
-          <span class="scope-title">Diagrama de flujo de señal</span>
+          <span class="scope-title">Diagrama de flujo de señal (edítalo aquí)</span>
         </div>
         <svg id="mason-svg" class="scope-svg" viewBox="0 0 900 460"></svg>
       </div>
