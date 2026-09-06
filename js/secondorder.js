@@ -31,6 +31,48 @@
     });
   }
 
+  // Mide t_r (10-90%) directamente sobre la curva muestreada, igual a como lo hace stepinfo() en Matlab.
+  function measureRiseTime10to90(tArr, yArr, yFinal) {
+    const y10 = 0.1 * yFinal, y90 = 0.9 * yFinal;
+    function crossTime(target) {
+      for (let i = 1; i < yArr.length; i++) {
+        const a = yArr[i - 1] - target, b = yArr[i] - target;
+        if (a === 0) return tArr[i - 1];
+        if (a * b < 0) {
+          return tArr[i - 1] + (target - yArr[i - 1]) * (tArr[i] - tArr[i - 1]) / (yArr[i] - yArr[i - 1]);
+        }
+      }
+      return null;
+    }
+    const t10 = crossTime(y10), t90 = crossTime(y90);
+    if (t10 == null || t90 == null) return null;
+    return t90 - t10;
+  }
+
+  function renderFormulaPanel(container, blocks) {
+    container.innerHTML = '';
+    blocks.forEach((b) => {
+      const card = document.createElement('div');
+      card.className = 'equation-card';
+      const title = document.createElement('div');
+      title.className = 'equation-title';
+      title.textContent = b.title;
+      card.appendChild(title);
+      const mathDiv = document.createElement('div');
+      mathDiv.className = 'equation';
+      card.appendChild(mathDiv);
+      MathFmt.render(mathDiv, b.tex, true);
+      if (b.note) {
+        const note = document.createElement('p');
+        note.className = 'hint';
+        note.style.marginTop = '8px';
+        note.textContent = b.note;
+        card.appendChild(note);
+      }
+      container.appendChild(card);
+    });
+  }
+
   function metrics(K, zeta, wn) {
     const out = { case: '', tr: null, tp: null, mp: null, ts2: null, ts5: null, poles: [], dc: K };
     if (zeta <= 0) {
@@ -68,8 +110,10 @@
     el('so-z-readout').textContent = zeta.toFixed(2);
     el('so-w-readout').textContent = wn.toFixed(2);
 
-    el('so-equation').textContent =
-      `T(s) = ${K.toFixed(2)}·${(wn * wn).toFixed(2)} / (s² + ${(2 * zeta * wn).toFixed(2)}s + ${(wn * wn).toFixed(2)})`;
+    const wn2 = wn * wn, twoZetaWn = 2 * zeta * wn;
+    MathFmt.render(el('so-equation'),
+      `T(s)=K\\dfrac{\\omega_n^2}{s^2+2\\zeta\\omega_n s+\\omega_n^2}=${K.toFixed(2)}\\dfrac{${wn2.toFixed(2)}}{s^2+${twoZetaWn.toFixed(2)}s+${wn2.toFixed(2)}}`,
+      true);
 
     const m = metrics(K, zeta, wn);
     el('so-case').textContent = m.case;
@@ -127,6 +171,78 @@
     };
     stepPlot.redrawOn(drawStep);
     drawStep();
+
+    // ---- Panel de fórmulas de la respuesta transitoria ----
+    const trMeasured = measureRiseTime10to90(tArr, yArr, yFinal);
+    const blocks = [];
+
+    if (zeta <= 0) {
+      blocks.push({
+        title: 'Caso: no amortiguado (ζ = 0)',
+        tex: `p_{1,2} = \\pm j\\omega_n = \\pm j${wn.toFixed(2)}`,
+        note: 'Oscilación permanente: la respuesta nunca se asienta, tp = π/ωₙ, y MP y tₛ no están definidos (footnote del capítulo).'
+      });
+    } else if (zeta < 1) {
+      const wd = wn * Math.sqrt(1 - zeta * zeta);
+      blocks.push({
+        title: 'Polos complejos conjugados',
+        tex: `p_{1,2} = -\\zeta\\omega_n \\pm j\\omega_n\\sqrt{1-\\zeta^2} = ${(-zeta * wn).toFixed(2)} \\pm j${wd.toFixed(2)}`
+      });
+    } else if (Math.abs(zeta - 1) < 1e-6) {
+      blocks.push({
+        title: 'Polo real doble',
+        tex: `p_{1,2} = -\\omega_n = ${(-wn).toFixed(2)}\\ \\text{(raíz repetida)}`
+      });
+    } else {
+      const s1 = zeta * wn + wn * Math.sqrt(zeta * zeta - 1);
+      const s2 = zeta * wn - wn * Math.sqrt(zeta * zeta - 1);
+      blocks.push({
+        title: 'Polos reales distintos',
+        tex: `p_{1,2} = -\\zeta\\omega_n \\pm \\omega_n\\sqrt{\\zeta^2-1} = ${(-s1).toFixed(2)},\\ ${(-s2).toFixed(2)}`
+      });
+    }
+
+    blocks.push({
+      title: 'Tiempo de subida tᵣ (10–90 %)',
+      tex: `t_r=\\dfrac{1}{\\omega_n}\\left(2.3\\zeta^2-0.078\\zeta+1.12\\right)` +
+        (zeta < 1 ? `=\\dfrac{1}{${wn.toFixed(2)}}\\left(2.3(${zeta.toFixed(2)})^2-0.078(${zeta.toFixed(2)})+1.12\\right)=${m.tr.toFixed(3)}\\text{ s}` : ''),
+      note: zeta < 1
+        ? `Medido directamente sobre la curva (como stepinfo de Matlab): ${trMeasured != null ? trMeasured.toFixed(3) + ' s' : '—'}.`
+        : `Fórmula empírica válida solo para 0 ≤ ζ < 1. Para ζ = ${zeta.toFixed(2)}, tᵣ medido numéricamente sobre la curva: ${trMeasured != null ? trMeasured.toFixed(3) + ' s' : '—'}.`
+    });
+
+    if (zeta < 1) {
+      const wd = wn * Math.sqrt(1 - zeta * zeta);
+      blocks.push({
+        title: 'Tiempo de pico t_p',
+        tex: `t_p=\\dfrac{\\pi}{\\omega_d}=\\dfrac{\\pi}{${wd.toFixed(2)}}=${m.tp.toFixed(3)}\\text{ s}`,
+        note: `ωd = ωₙ√(1−ζ²) = ${wd.toFixed(2)} rad/s.`
+      });
+      blocks.push({
+        title: 'Máximo pico porcentual MP',
+        tex: `MP=e^{-\\zeta\\pi/\\sqrt{1-\\zeta^2}}\\times100\\%=${m.mp.toFixed(2)}\\%`
+      });
+    } else {
+      blocks.push({
+        title: 'Tiempo de pico t_p y sobrepaso MP',
+        tex: `t_p:\\ \\text{no definido} \\qquad MP=0\\%`,
+        note: 'Sistema sin oscilación: no hay overshoot ni un primer pico que medir (nota al pie del capítulo sobre sistemas sobreamortiguados).'
+      });
+    }
+
+    if (zeta > 0) {
+      blocks.push({
+        title: 'Tiempo de asentamiento tₛ',
+        tex: `t_s\\big|_{2\\%}=\\dfrac{4}{\\zeta\\omega_n}=${m.ts2.toFixed(3)}\\text{ s}\\qquad t_s\\big|_{5\\%}=\\dfrac{3}{\\zeta\\omega_n}=${m.ts5.toFixed(3)}\\text{ s}`
+      });
+    } else {
+      blocks.push({
+        title: 'Tiempo de asentamiento tₛ',
+        tex: `t_s:\\ \\text{no definido (sin amortiguamiento, la oscilación nunca decae)}`
+      });
+    }
+
+    renderFormulaPanel(el('so-formula-panel'), blocks);
 
     // ---- Pole-zero plot ----
     const maxPoleMag = Math.max(...m.poles.map(p => Math.hypot(p.re, p.im)), wn) * 1.3 || 1;
