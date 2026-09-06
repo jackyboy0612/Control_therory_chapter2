@@ -28,13 +28,14 @@
   function newNodeId() { nodeCounter += 1; return 'N' + nodeCounter; }
   function newEdgeId() { edgeCounter += 1; return 'e' + edgeCounter; }
 
-  function resetAll(withNodes = [], withEdges = [], src = null, snk = null) {
+  function resetAll(withNodes = [], withEdges = [], src = null, snk = null, bdType = null) {
     nodes = withNodes; edges = withEdges; source = src; sink = snk;
     nodeCounter = nodes.length ? Math.max(...nodes.map(n => parseInt(n.id.slice(1)))) : 0;
     edgeCounter = edges.length;
     refreshSelects();
     renderSVG();
     renderLists();
+    renderBlockDiagram(bdType);
     resultsEl.innerHTML = '<p class="hint">Presiona <span class="mono">Calcular</span> para aplicar la ley de Mason.</p>';
   }
 
@@ -44,6 +45,7 @@
     refreshSelects();
     renderSVG();
     renderLists();
+    renderBlockDiagram(null); // el diagrama de bloques deja de corresponder si se edita a mano
   }
 
   function removeNode(id) {
@@ -54,6 +56,7 @@
     refreshSelects();
     renderSVG();
     renderLists();
+    renderBlockDiagram(null);
   }
 
   function addEdge(from, to, gain) {
@@ -61,12 +64,14 @@
     edges.push({ id: newEdgeId(), from, to, gain: gain || 'G' });
     renderSVG();
     renderLists();
+    renderBlockDiagram(null);
   }
 
   function removeEdge(id) {
     edges = edges.filter(e => e.id !== id);
     renderSVG();
     renderLists();
+    renderBlockDiagram(null);
   }
 
   function refreshSelects() {
@@ -144,31 +149,54 @@
     defs.appendChild(marker);
     svg.appendChild(defs);
 
+    // Cada par de nodos comparte UNA sola dirección normal canónica (A->B, A=id menor).
+    // Ramas que van A->B se curvan hacia un lado; ramas B->A se curvan hacia el lado opuesto.
+    // Así una retroalimentación nunca comparte la curva con su trayecto directo (bug anterior).
     const groups = edgeGroups();
-    Object.values(groups).forEach(group => {
-      const n = group.length;
-      group.forEach((e, i) => {
-        const offset = n === 1 ? 0 : (i - (n - 1) / 2) * 34;
-        drawEdge(e, offset);
+    Object.entries(groups).forEach(([key, group]) => {
+      const [idA, idB] = key.split('|');
+      const nodeA = nodes.find(n => n.id === idA);
+      const nodeB = nodes.find(n => n.id === idB);
+      if (!nodeA || !nodeB) return;
+
+      if (group.length === 1) {
+        drawEdge(group[0], { x: 0, y: 0 });
+        return;
+      }
+
+      const dx = nodeB.x - nodeA.x, dy = nodeB.y - nodeA.y;
+      const dist = Math.hypot(dx, dy) || 1;
+      const ux = dx / dist, uy = dy / dist;
+      const nx = -uy, ny = ux; // normal canónica, fija para todo el grupo
+      const BASE = 30;
+
+      const forward = group.filter(e => e.from === idA && e.to === idB);
+      const backward = group.filter(e => e.from === idB && e.to === idA);
+      forward.forEach((e, i) => {
+        const mag = BASE * (i + 1);
+        drawEdge(e, { x: nx * mag, y: ny * mag });
+      });
+      backward.forEach((e, i) => {
+        const mag = BASE * (i + 1);
+        drawEdge(e, { x: -nx * mag, y: -ny * mag });
       });
     });
 
     nodes.forEach(n => drawNode(n));
   }
 
-  function drawEdge(e, offset) {
+  function drawEdge(e, offsetVec) {
     const a = nodes.find(n => n.id === e.from);
     const b = nodes.find(n => n.id === e.to);
     if (!a || !b) return;
     const dx = b.x - a.x, dy = b.y - a.y;
     const dist = Math.hypot(dx, dy) || 1;
     const ux = dx / dist, uy = dy / dist;
-    const nx = -uy, ny = ux; // normal
     const R = 22; // node radius
     const sx = a.x + ux * R, sy = a.y + uy * R;
     const ex = b.x - ux * R, ey = b.y - uy * R;
-    const mx = (sx + ex) / 2 + nx * offset;
-    const my = (sy + ey) / 2 + ny * offset;
+    const mx = (sx + ex) / 2 + offsetVec.x;
+    const my = (sy + ey) / 2 + offsetVec.y;
 
     const path = svgEl('path', {
       d: `M ${sx} ${sy} Q ${mx} ${my} ${ex} ${ey}`,
@@ -179,9 +207,10 @@
     });
     svg.appendChild(path);
 
-    const labelPos = offset === 0
-      ? { x: (sx + ex) / 2, y: (sy + ey) / 2 - 8 }
-      : { x: mx, y: my - Math.sign(offset || 1) * 2 };
+    const mag = Math.hypot(offsetVec.x, offsetVec.y);
+    const labelPos = mag < 1
+      ? { x: (sx + ex) / 2, y: (sy + ey) / 2 - 10 }
+      : { x: mx + (offsetVec.x / mag) * 12, y: my + (offsetVec.y / mag) * 12 };
 
     const labelBg = svgEl('rect', {
       x: labelPos.x - (e.gain.length * 3.6) - 4, y: labelPos.y - 11,
@@ -242,6 +271,118 @@
     const y = (ev.clientY - rect.top) * scaleY;
     addNodeAt(x, y);
   });
+
+  /* ---------------- Diagrama de bloques estático (equivalente ilustrativo) ---------------- */
+
+  const bdSvg = document.getElementById('mason-bd-svg');
+  const bdWrap = document.getElementById('mason-bd-wrap');
+
+  function bdEl(tag, attrs, text) {
+    const e = document.createElementNS(NS, tag);
+    Object.entries(attrs).forEach(([k, v]) => e.setAttribute(k, v));
+    if (text != null) e.textContent = text;
+    return e;
+  }
+
+  function bdArrowDefs() {
+    const defs = bdEl('defs', {});
+    const marker = bdEl('marker', {
+      id: 'bd-arrow', viewBox: '0 0 10 10', refX: '9', refY: '5',
+      markerWidth: '7', markerHeight: '7', orient: 'auto-start-reverse'
+    });
+    marker.appendChild(bdEl('path', { d: 'M0,0 L10,5 L0,10 z', fill: '#F2A93C' }));
+    defs.appendChild(marker);
+    return defs;
+  }
+
+  function bdLine(x1, y1, x2, y2, withArrow = true) {
+    return bdEl('path', {
+      d: `M ${x1} ${y1} L ${x2} ${y2}`,
+      fill: 'none', stroke: '#F2A93C', 'stroke-width': '2',
+      'marker-end': withArrow ? 'url(#bd-arrow)' : ''
+    });
+  }
+
+  function bdBox(x, y, w, h, label) {
+    const g = bdEl('g', {});
+    g.appendChild(bdEl('rect', {
+      x, y, width: w, height: h, rx: 3,
+      fill: '#1F2650', stroke: '#F2A93C', 'stroke-width': '2'
+    }));
+    g.appendChild(bdEl('text', {
+      x: x + w / 2, y: y + h / 2 + 5, 'text-anchor': 'middle',
+      fill: '#ECEBF2', 'font-family': 'IBM Plex Mono, monospace', 'font-size': '15', 'font-weight': '600'
+    }, label));
+    return g;
+  }
+
+  function bdLabel(x, y, text, color = '#57D6C7', anchor = 'middle') {
+    return bdEl('text', {
+      x, y, 'text-anchor': anchor,
+      fill: color, 'font-family': 'IBM Plex Mono, monospace', 'font-size': '13'
+    }, text);
+  }
+
+  function bdSumCircle(cx, cy, r = 16) {
+    return bdEl('circle', {
+      cx, cy, r, fill: '#1F2650', stroke: '#F2A93C', 'stroke-width': '2'
+    });
+  }
+
+  function renderBlockDiagramSeries() {
+    bdSvg.setAttribute('viewBox', '0 0 640 160');
+    bdSvg.appendChild(bdArrowDefs());
+    bdSvg.appendChild(bdLabel(30, 75, 'R(s)', '#ECEBF2'));
+    bdSvg.appendChild(bdLine(58, 70, 150, 70));
+    bdSvg.appendChild(bdBox(150, 45, 110, 50, 'G₁(s)'));
+    bdSvg.appendChild(bdLabel(315, 58, 'Z(s)'));
+    bdSvg.appendChild(bdLine(260, 70, 370, 70));
+    bdSvg.appendChild(bdBox(370, 45, 110, 50, 'G₂(s)'));
+    bdSvg.appendChild(bdLine(480, 70, 580, 70));
+    bdSvg.appendChild(bdLabel(605, 75, 'Y(s)', '#ECEBF2'));
+  }
+
+  function renderBlockDiagramFeedback() {
+    bdSvg.setAttribute('viewBox', '0 0 640 240');
+    bdSvg.appendChild(bdArrowDefs());
+    // R(s) -> sumador
+    bdSvg.appendChild(bdLabel(20, 75, 'R(s)', '#ECEBF2'));
+    bdSvg.appendChild(bdLine(50, 70, 122, 70));
+    bdSvg.appendChild(bdLabel(105, 55, '+', '#F2A93C'));
+    bdSvg.appendChild(bdSumCircle(138, 70));
+    // sumador -> G(s)
+    bdSvg.appendChild(bdLabel(180, 55, 'E(s)'));
+    bdSvg.appendChild(bdLine(154, 70, 250, 70));
+    bdSvg.appendChild(bdBox(250, 45, 100, 50, 'G(s)'));
+    // G(s) -> Y(s), con punto de bifurcación
+    bdSvg.appendChild(bdLine(350, 70, 460, 70));
+    bdSvg.appendChild(bdEl('circle', { cx: 430, cy: 70, r: 3.5, fill: '#57D6C7' }));
+    bdSvg.appendChild(bdLabel(490, 75, 'Y(s)', '#ECEBF2'));
+    // rama de retroalimentación: baja, pasa por H(s), sube al "-" del sumador
+    bdSvg.appendChild(bdLine(430, 70, 430, 190, false));
+    bdSvg.appendChild(bdLine(430, 190, 218, 190));
+    bdSvg.appendChild(bdBox(118, 165, 100, 50, 'H(s)'));
+    bdSvg.appendChild(bdLine(118, 190, 138, 190, false));
+    bdSvg.appendChild(bdLine(138, 190, 138, 88));
+    bdSvg.appendChild(bdLabel(155, 145, 'Z(s)'));
+    bdSvg.appendChild(bdLabel(120, 95, '−', '#E8607A'));
+  }
+
+  function renderBlockDiagram(type) {
+    bdSvg.innerHTML = '';
+    if (type === 'series') {
+      bdWrap.style.display = '';
+      renderBlockDiagramSeries();
+    } else if (type === 'feedback') {
+      bdWrap.style.display = '';
+      renderBlockDiagramFeedback();
+    } else {
+      bdWrap.style.display = '';
+      bdSvg.setAttribute('viewBox', '0 0 640 120');
+      bdSvg.appendChild(bdLabel(320, 50, 'Sin diagrama de bloques predefinido', '#6B7299'));
+      bdSvg.appendChild(bdLabel(320, 72, 'para este grafo (ejemplo o edición personalizada).', '#6B7299'));
+    }
+  }
 
   addNodeBtn.addEventListener('click', () => {
     addNodeMode = !addNodeMode;
@@ -485,7 +626,7 @@
       { id: 'e12', from: 'N9', to: 'N8', gain: '-H3' },
       { id: 'e13', from: 'N9', to: 'N7', gain: 'G9' },
     ];
-    resetAll(withNodes, withEdges, 'N1', 'N7');
+    resetAll(withNodes, withEdges, 'N1', 'N7', null);
   }
 
   function presetFeedback() {
@@ -499,12 +640,27 @@
       { id: 'e2', from: 'N2', to: 'N3', gain: 'G' },
       { id: 'e3', from: 'N3', to: 'N2', gain: '-H' },
     ];
-    resetAll(withNodes, withEdges, 'N1', 'N3');
+    resetAll(withNodes, withEdges, 'N1', 'N3', 'feedback');
   }
 
+  function presetSeries() {
+    // Reproduce la Figura 3.15: dos bloques en serie, sin retroalimentación.
+    const withNodes = [
+      { id: 'N1', x: 140, y: 230 },
+      { id: 'N2', x: 420, y: 230 },
+      { id: 'N3', x: 700, y: 230 },
+    ];
+    const withEdges = [
+      { id: 'e1', from: 'N1', to: 'N2', gain: 'G1' },
+      { id: 'e2', from: 'N2', to: 'N3', gain: 'G2' },
+    ];
+    resetAll(withNodes, withEdges, 'N1', 'N3', 'series');
+  }
+
+  el('mason-preset-series').addEventListener('click', presetSeries);
   el('mason-preset-fig320').addEventListener('click', presetFig320);
   el('mason-preset-feedback').addEventListener('click', presetFeedback);
-  el('mason-preset-clear').addEventListener('click', () => resetAll([], [], null, null));
+  el('mason-preset-clear').addEventListener('click', () => resetAll([], [], null, null, null));
 
   window.addEventListener('DOMContentLoaded', presetFeedback);
 })();
