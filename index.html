@@ -113,12 +113,6 @@
             <span class="legend-dot cyan"></span> Tangente en x̄
           </span>
         </div>
-        <div class="zoom-bar">
-          <button class="zoom-btn" id="lin-zoom-out" title="Alejar">−</button>
-          <button class="zoom-btn" id="lin-zoom-reset" title="Restablecer zoom">100%</button>
-          <button class="zoom-btn" id="lin-zoom-in" title="Acercar">+</button>
-          <span class="zoom-hint">Rueda del mouse o arrastra para explorar</span>
-        </div>
         <canvas id="lin-canvas" class="scope-canvas"></canvas>
       </div>
 
@@ -203,12 +197,6 @@
             <span class="legend-dot rose"></span> t_p
           </span>
         </div>
-        <div class="zoom-bar">
-          <button class="zoom-btn" id="so-step-zoom-out" title="Alejar">−</button>
-          <button class="zoom-btn" id="so-step-zoom-reset" title="Restablecer zoom">100%</button>
-          <button class="zoom-btn" id="so-step-zoom-in" title="Acercar">+</button>
-          <span class="zoom-hint">Rueda del mouse o arrastra para explorar</span>
-        </div>
         <canvas id="so-step-canvas" class="scope-canvas"></canvas>
       </div>
       <div class="scope">
@@ -219,12 +207,6 @@
             <span class="legend-dot cyan"></span> ωₙ, ζ
             <span class="legend-dot rose"></span> tₛ
           </span>
-        </div>
-        <div class="zoom-bar">
-          <button class="zoom-btn" id="so-pz-zoom-out" title="Alejar">−</button>
-          <button class="zoom-btn" id="so-pz-zoom-reset" title="Restablecer zoom">100%</button>
-          <button class="zoom-btn" id="so-pz-zoom-in" title="Acercar">+</button>
-          <span class="zoom-hint">Rueda del mouse o arrastra para explorar</span>
         </div>
         <canvas id="so-pz-canvas" class="scope-canvas short"></canvas>
       </div>
@@ -240,10 +222,10 @@
 <section id="panel-mason" class="panel">
   <div class="panel-head">
     <h1>Diagramas de bloques y ley de Mason</h1>
-    <p class="lede">Un diagrama en bloques (rectángulos con la función de transferencia, sumadores y puntos de bifurcación)
-    se convierte en un <strong>diagrama de flujo de señal</strong> (nodos y ramas con ganancia) para poder aplicar la
-    fórmula de Mason. Abajo puedes ver ambas representaciones para los ejemplos del capítulo, y editar libremente el
-    diagrama de flujo de señal para construir el tuyo.</p>
+    <p class="lede">Construye el diagrama de bloques directamente: describe cada bloque como
+    <span class="mono">de señal → a señal, con ganancia</span> (p. ej. <span class="mono">R → E, ganancia 1</span>,
+    luego <span class="mono">E → Y, ganancia G</span>). Las señales (los círculos) se crean solas cuando las nombras.
+    El programa arma el diagrama de flujo de señal equivalente automáticamente y aplica la ley de Mason.</p>
   </div>
 
   <div class="rack rack-mason">
@@ -251,34 +233,28 @@
       <div class="control-group">
         <label class="control-label">Ejemplos del capítulo</label>
         <div class="preset-row column">
-          <button class="chip-btn wide" id="mason-preset-series">Serie G₁(s)·G₂(s) — Fig. 3.15</button>
-          <button class="chip-btn wide" id="mason-preset-feedback">Retroalimentación G(s), H(s) — Fig. 3.16</button>
+          <button class="chip-btn wide" id="mason-preset-series">Serie G₁·G₂ — Fig. 3.15</button>
+          <button class="chip-btn wide" id="mason-preset-feedback">Retroalimentación G, H — Fig. 3.16</button>
           <button class="chip-btn wide" id="mason-preset-fig320">Figura 3.20 — 9 nodos, 4 lazos</button>
           <button class="chip-btn wide" id="mason-preset-clear">Vaciar lienzo</button>
         </div>
       </div>
 
       <div class="control-group">
-        <label class="control-label">1 · Agregar nodo</label>
+        <label class="control-label">Agregar bloque</label>
+        <p class="hint">Escribe el nombre de la señal de entrada y de salida del bloque. Si el nombre no existe
+        todavía, se crea automáticamente — no hay que declarar señales por separado.</p>
         <div class="inline-row">
-          <button id="mason-add-node-mode" class="tool-btn">Haz clic en el lienzo →</button>
-        </div>
-        <p class="hint">Cada clic sobre el lienzo de nodos crea uno nuevo (N1, N2, …). Arrástralos para reordenar.</p>
-      </div>
-
-      <div class="control-group">
-        <label class="control-label">2 · Agregar rama</label>
-        <div class="inline-row">
-          <select id="mason-edge-from" class="dial-select small"></select>
+          <input id="mason-block-from" class="dial-input mono small" type="text" placeholder="de: R" value="">
           <span class="arrow-glyph">→</span>
-          <select id="mason-edge-to" class="dial-select small"></select>
+          <input id="mason-block-to" class="dial-input mono small" type="text" placeholder="a: Y" value="">
         </div>
-        <input id="mason-edge-gain" class="dial-input mono" type="text" placeholder="ganancia, p. ej. G1 o -H1" value="G1">
-        <button id="mason-add-edge" class="tool-btn full">+ Añadir rama</button>
+        <input id="mason-block-gain" class="dial-input mono" type="text" placeholder="ganancia, p. ej. G o -H" value="G">
+        <button id="mason-add-block" class="tool-btn full">+ Agregar bloque</button>
       </div>
 
       <div class="control-group">
-        <label class="control-label">3 · Entrada / salida</label>
+        <label class="control-label">Entrada / salida del sistema</label>
         <div class="inline-row">
           <select id="mason-source" class="dial-select small"></select>
           <span class="arrow-glyph">⇢</span>
@@ -291,27 +267,28 @@
       </div>
 
       <div class="control-group">
-        <label class="control-label">Ramas actuales</label>
+        <label class="control-label">Bloques actuales</label>
         <div id="mason-edge-list" class="mini-list"></div>
       </div>
       <div class="control-group">
-        <label class="control-label">Nodos actuales</label>
+        <label class="control-label">Señales actuales</label>
         <div id="mason-node-list" class="mini-list"></div>
       </div>
+      <p class="hint">Arrastra los círculos o los puntos ◇ sobre las curvas para acomodar el diagrama a tu gusto.</p>
     </div>
 
     <div class="scope-stack">
-      <div class="scope" id="mason-bd-wrap">
+      <div class="scope">
         <div class="scope-head">
-          <span class="scope-title">Diagrama de bloques equivalente</span>
+          <span class="scope-title">Diagrama de bloques (edítalo aquí)</span>
         </div>
-        <svg id="mason-bd-svg" class="scope-svg bd" viewBox="0 0 640 260"></svg>
+        <svg id="mason-block-svg" class="scope-svg" viewBox="0 0 900 460"></svg>
       </div>
       <div class="scope">
         <div class="scope-head">
-          <span class="scope-title">Diagrama de flujo de señal (edítalo aquí)</span>
+          <span class="scope-title">Diagrama de flujo de señal — generado automáticamente</span>
         </div>
-        <svg id="mason-svg" class="scope-svg" viewBox="0 0 900 460"></svg>
+        <svg id="mason-node-svg" class="scope-svg readonly" viewBox="0 0 900 460"></svg>
       </div>
       <div class="results-panel" id="mason-results">
         <p class="hint">Construye el diagrama y presiona <span class="mono">Calcular</span> para ver trayectos, lazos y T(s).</p>
