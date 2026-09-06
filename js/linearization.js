@@ -347,10 +347,6 @@
     render();
   });
 
-  el('lin-zoom-in').addEventListener('click', () => plot.zoomBy(1.35));
-  el('lin-zoom-out').addEventListener('click', () => plot.zoomBy(1 / 1.35));
-  el('lin-zoom-reset').addEventListener('click', () => plot.resetZoom());
-
   window.addEventListener('DOMContentLoaded', () => {
     renderTaylorFormula();
     applyPreset('eq1a');
