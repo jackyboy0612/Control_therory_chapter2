@@ -180,6 +180,7 @@ main{ max-width: 1280px; margin: 0 auto; padding: 0 28px 60px; }
 }
 .dial-select.small{ font-size: 12.5px; padding: 7px 8px; }
 .dial-input.mono{ font-family: var(--mono); }
+.dial-input.small{ font-size: 12.5px; padding: 7px 8px; }
 
 .hint{ font-size: 12px; color: var(--ink-faint); margin: 0; }
 
@@ -235,6 +236,7 @@ main{ max-width: 1280px; margin: 0 auto; padding: 0 28px 60px; }
 .chip-btn.wide{ text-align:left; }
 
 .inline-row{ display:flex; align-items:center; gap:8px; }
+.inline-row .dial-input, .inline-row .dial-select{ flex: 1; min-width: 0; }
 .arrow-glyph{ color: var(--ink-faint); font-size: 15px; }
 
 .tool-btn{
@@ -305,28 +307,6 @@ main{ max-width: 1280px; margin: 0 auto; padding: 0 28px 60px; }
 .legend-dot.cyan{ background: var(--cyan); }
 .legend-dot.rose{ background: var(--rose); }
 
-.zoom-bar{
-  display:flex; align-items:center; gap:6px;
-  padding: 8px 16px;
-  border-bottom: 1px solid var(--border-soft);
-  background: var(--panel-alt);
-}
-.zoom-btn{
-  background: var(--panel);
-  border: 1px solid var(--border);
-  color: var(--ink);
-  font-family: var(--mono);
-  font-size: 12px;
-  width: 30px; height: 26px;
-  border-radius: var(--radius);
-  cursor: pointer;
-  display:flex; align-items:center; justify-content:center;
-}
-.zoom-btn:hover{ border-color: var(--amber); color: var(--amber); }
-#lin-zoom-reset, #so-step-zoom-reset, #so-pz-zoom-reset{ width: auto; padding: 0 8px; }
-.zoom-hint{ font-size: 11px; color: var(--ink-faint); margin-left: 8px; }
-@media (max-width: 640px){ .zoom-hint{ display:none; } }
-
 .scope-canvas{
   display:block;
   width: 100%;
@@ -348,9 +328,9 @@ main{ max-width: 1280px; margin: 0 auto; padding: 0 28px 60px; }
     #10142E;
   cursor: crosshair;
 }
-.scope-svg.bd{
-  height: 220px;
+.scope-svg.readonly{
   cursor: default;
+  opacity: 0.92;
 }
 
 .results-panel{
