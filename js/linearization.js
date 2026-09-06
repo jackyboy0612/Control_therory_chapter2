@@ -56,11 +56,20 @@
       } catch (e) {
         compiledDfdu = { evaluate: () => 0 };
       }
+      try {
+        MathFmt.render(el('lin-fx-tex'), `f(x,u) = ${node.toTex()}`, true);
+      } catch (e) { /* ignore tex conversion issues */ }
       return true;
     } catch (e) {
       compiledF = null;
       return false;
     }
+  }
+
+  function renderTaylorFormula() {
+    MathFmt.render(el('lin-taylor-formula'),
+      `f(x) \\approx f(\\bar{x}) + \\left.\\frac{\\partial f}{\\partial x}\\right|_{\\bar{x}}\\big(x-\\bar{x}\\big) \\;=\\; f(\\bar{x}) + \\left.\\frac{\\partial f}{\\partial x}\\right|_{\\bar{x}}\\hat{x}(t)`,
+      true);
   }
 
   function f(x, u) {
@@ -177,9 +186,10 @@
     el('lin-error').textContent = isFinite(maxRelErr) ? (maxRelErr * 100).toFixed(1) + ' %' : '—';
 
     const term2 = state.uRange && Math.abs(dU) > 1e-9
-      ? ` + (${dU.toFixed(3)})·û(t)` : '';
-    el('lin-equation').textContent =
-      `x̂̇(t) ≈ (${slope.toFixed(3)})·x̂(t)${term2}`;
+      ? ` + (${dU.toFixed(3)})\\,\\hat{u}(t)` : '';
+    MathFmt.render(el('lin-equation'),
+      `\\dot{\\hat{x}}(t) \\approx (${slope.toFixed(3)})\\,\\hat{x}(t)${term2}`,
+      true);
   }
 
   presetSel.addEventListener('change', () => applyPreset(presetSel.value));
@@ -194,7 +204,10 @@
     render();
   });
 
-  window.addEventListener('DOMContentLoaded', () => applyPreset('taylor'));
+  window.addEventListener('DOMContentLoaded', () => {
+    renderTaylorFormula();
+    applyPreset('taylor');
+  });
   // In case app.js triggers visibility change, replot to fix canvas sizing
   window.__linRender = render;
 })();
