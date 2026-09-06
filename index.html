@@ -6,6 +6,7 @@
 <title>Laboratorio de Control · Linealización, 2º Orden y Mason</title>
 <link rel="preconnect" href="https://fonts.googleapis.com">
 <link href="https://fonts.googleapis.com/css2?family=Spectral:wght@500;600;700&family=IBM+Plex+Sans:wght@400;500;600&family=IBM+Plex+Mono:wght@400;500;600&display=swap" rel="stylesheet">
+<link rel="stylesheet" href="https://cdnjs.cloudflare.com/ajax/libs/KaTeX/0.16.9/katex.min.css">
 <link rel="stylesheet" href="css/style.css">
 </head>
 <body>
@@ -97,19 +98,32 @@
 
       <div class="equation-card">
         <div class="equation-title">Sistema linealizado</div>
-        <div class="mono equation" id="lin-equation">x̂̇(t) ≈ 0</div>
+        <div class="equation" id="lin-equation"></div>
       </div>
     </div>
 
-    <div class="scope">
-      <div class="scope-head">
-        <span class="scope-title">f(x) vs. x — no lineal (ámbar) y linealizado (cian)</span>
-        <span class="scope-legend">
-          <span class="legend-dot amber"></span> f(x)
-          <span class="legend-dot cyan"></span> Tangente en x̄
-        </span>
+    <div class="scope-stack">
+      <div class="scope">
+        <div class="scope-head">
+          <span class="scope-title">f(x) vs. x — no lineal (ámbar) y linealizado (cian)</span>
+          <span class="scope-legend">
+            <span class="legend-dot amber"></span> f(x)
+            <span class="legend-dot cyan"></span> Tangente en x̄
+          </span>
+        </div>
+        <canvas id="lin-canvas" class="scope-canvas"></canvas>
       </div>
-      <canvas id="lin-canvas" class="scope-canvas"></canvas>
+
+      <div class="results-panel">
+        <div class="equation-card">
+          <div class="equation-title">Función ingresada</div>
+          <div class="equation" id="lin-fx-tex"></div>
+        </div>
+        <div class="equation-card">
+          <div class="equation-title">Expansión de Taylor de primer orden alrededor de x̄ (Ec. 3.6)</div>
+          <div class="equation" id="lin-taylor-formula"></div>
+        </div>
+      </div>
     </div>
   </div>
 </section>
@@ -157,7 +171,7 @@
 
       <div class="equation-card">
         <div class="equation-title">Función de transferencia</div>
-        <div class="mono equation" id="so-equation">T(s) = 1.00·16.00 / (s² + 3.60s + 16.00)</div>
+        <div class="equation" id="so-equation"></div>
       </div>
 
       <div class="readout-block" id="so-case-block">
@@ -183,6 +197,10 @@
           <span class="scope-title">Plano-s — ubicación de los polos</span>
         </div>
         <canvas id="so-pz-canvas" class="scope-canvas short"></canvas>
+      </div>
+
+      <div class="results-panel" id="so-formula-panel">
+        <p class="hint">Calculando…</p>
       </div>
     </div>
   </div>
@@ -271,7 +289,9 @@
 </footer>
 
 <script src="https://cdnjs.cloudflare.com/ajax/libs/mathjs/12.4.1/math.min.js"></script>
+<script src="https://cdnjs.cloudflare.com/ajax/libs/KaTeX/0.16.9/katex.min.js"></script>
 <script src="js/plot.js"></script>
+<script src="js/mathfmt.js"></script>
 <script src="js/linearization.js"></script>
 <script src="js/secondorder.js"></script>
 <script src="js/mason.js"></script>
