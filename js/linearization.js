@@ -51,6 +51,9 @@
   const rangeScaleSlider = el('lin-range-scale');
   const rangeReadout = el('lin-range-readout');
   const rangeValuesEl = el('lin-range-values');
+  const yScaleSlider = el('lin-yrange-scale');
+  const yRangeReadout = el('lin-yrange-readout');
+  const yRangeValuesEl = el('lin-yrange-values');
 
   const canvas = el('lin-canvas');
   const plot = new CartesianPlot(canvas);
@@ -59,7 +62,8 @@
   let compiledF = null, compiledDfdx = null, compiledDfdu = null;
   let equilibria = [];
   let selectedEq = null; // valor x̄ actualmente seleccionado
-  let yBounds = [-1, 1]; // límites fijos del eje Y — solo se recalculan al cambiar de función o de rango de x
+  let yBoundsBase = [-1, 1];    // límites "naturales" — solo cambian con la función, preset o rango de x
+  let yBoundsDisplay = [-1, 1]; // límites realmente mostrados = yBoundsBase escalado por el slider de y
 
   function compile() {
     try {
@@ -208,8 +212,24 @@
       uSlider.value = p.u;
     }
     compile();
-    yBounds = computeStableYBounds();
+    yBoundsBase = computeStableYBounds();
+    yScaleSlider.value = 1;
+    recomputeYDisplay();
     refreshEquilibriaSelect(null);
+    render();
+  }
+
+  function recomputeYDisplay() {
+    const scale = parseFloat(yScaleSlider.value);
+    const center = (yBoundsBase[0] + yBoundsBase[1]) / 2;
+    const half = (yBoundsBase[1] - yBoundsBase[0]) / 2 * scale;
+    yBoundsDisplay = [center - half, center + half];
+    yRangeReadout.textContent = `×${scale.toFixed(1)}`;
+    yRangeValuesEl.textContent = `${yBoundsDisplay[0].toFixed(2)}, ${yBoundsDisplay[1].toFixed(2)}`;
+  }
+
+  function applyYScale() {
+    recomputeYDisplay();
     render();
   }
 
@@ -221,7 +241,8 @@
     state.xRange = [center - half, center + half];
     rangeReadout.textContent = `×${scale.toFixed(1)}`;
     rangeValuesEl.textContent = `${state.xRange[0].toFixed(2)}, ${state.xRange[1].toFixed(2)}`;
-    yBounds = computeStableYBounds();
+    yBoundsBase = computeStableYBounds();
+    recomputeYDisplay();
     refreshEquilibriaSelect(selectedEq);
     render();
   }
@@ -239,8 +260,8 @@
     const pad = (xr1 - xr0) * 0.06;
 
     // muestreo de f(x,u) para graficar — SIEMPRE, haya o no equilibrio.
-    // El eje Y usa `yBounds` (fijo, calculado sobre todo el rango de u) y NO se recalcula aquí,
-    // para que el marco no "tiemble" al mover u o cambiar de equilibrio.
+    // El eje Y usa `yBoundsDisplay` (fijo salvo por el slider de amplitud de y) y NO se recalcula
+    // a partir de la curva actual aquí, para que el marco no "tiemble" al mover u o el equilibrio.
     const N = 260;
     const curve = [];
     for (let i = 0; i <= N; i++) {
@@ -248,7 +269,7 @@
       const y = f(x, u);
       curve.push([x, y]);
     }
-    plot.setBounds(xr0 - pad, xr1 + pad, yBounds[0], yBounds[1]);
+    plot.setBounds(xr0 - pad, xr1 + pad, yBoundsDisplay[0], yBoundsDisplay[1]);
 
     if (selectedEq == null || equilibria.length === 0) {
       const drawCurveOnly = () => {
@@ -373,9 +394,15 @@
   presetSel.addEventListener('change', () => applyPreset(presetSel.value));
   customInput.addEventListener('input', () => {
     state.expr = customInput.value;
-    if (compile()) { yBounds = computeStableYBounds(); refreshEquilibriaSelect(null); render(); }
+    if (compile()) {
+      yBoundsBase = computeStableYBounds();
+      recomputeYDisplay();
+      refreshEquilibriaSelect(null);
+      render();
+    }
   });
   rangeScaleSlider.addEventListener('input', applyRangeScale);
+  yScaleSlider.addEventListener('input', applyYScale);
   uSlider.addEventListener('input', () => {
     refreshEquilibriaSelect(selectedEq);
     render();
