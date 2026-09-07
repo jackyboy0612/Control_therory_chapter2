@@ -1,378 +1,326 @@
-/* linearization.js — sección 1: linealización de sistemas no lineales ẋ = f(x,u)
-   Restringida a puntos de equilibrio: f(x̄,ū) = 0. Los equilibrios se detectan
-   numéricamente (barrido + bisección) y se ofrecen como las únicas opciones válidas. */
+<!DOCTYPE html>
+<html lang="es">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<title>Laboratorio de Control · Linealización, 2º Orden y Mason</title>
+<link rel="preconnect" href="https://fonts.googleapis.com">
+<link href="https://fonts.googleapis.com/css2?family=Spectral:wght@500;600;700&family=IBM+Plex+Sans:wght@400;500;600&family=IBM+Plex+Mono:wght@400;500;600&display=swap" rel="stylesheet">
+<link rel="stylesheet" href="https://cdnjs.cloudflare.com/ajax/libs/KaTeX/0.16.9/katex.min.css">
+<link rel="stylesheet" href="css/style.css">
+</head>
+<body>
 
-(function () {
-  const PRESETS = {
-    eq1a: {
-      // Ejercicio 1(a) de "Ejercicios de Repaso": ẋ = -x + 2√x + u, alrededor de ū=0, x̄>0.
-      expr: '-x + 2*sqrt(x) + u',
-      xRange: [0, 10],
-      u: 0, uRange: null,
-      xLabel: 'x', yLabel: 'ẋ = f(x,u)'
-    },
-    bistable: {
-      // ẋ = x - x^3 : tres equilibrios en x = -1, 0, 1 (uno inestable, dos estables)
-      expr: 'x - x^3',
-      xRange: [-2, 2],
-      u: 0, uRange: null,
-      xLabel: 'x', yLabel: 'ẋ = f(x)'
-    },
-    reactor: {
-      // dx/dt = -k x^2 + (u/V)(c - x), k=1, V=1, c=2 (ejemplo del capítulo)
-      expr: '-1*x^2 + (u/1)*(2-x)',
-      xRange: [-0.5, 4],
-      u: 1, uRange: [0, 3],
-      xLabel: 'x (concentración, mol/L)', yLabel: 'ẋ = f(x,u)'
-    },
-    tank: {
-      // dh/dt = (q - c*sqrt(h))/A, A=2, c=0.5 (ejercicio de repaso). Equilibrio en h̄=4q̄² (visible para q̄≤1.5).
-      expr: '(u - 0.5*sqrt(x))/2',
-      xRange: [0, 10],
-      u: 1, uRange: [0, 1.5],
-      xLabel: 'h (nivel, m)', yLabel: 'ḣ = f(h,q)'
-    },
-    custom: {
-      expr: 'x*sqrt(x^2+5*x)',
-      xRange: [0, 12],
-      u: 1, uRange: [0, 5],
-      xLabel: 'x', yLabel: 'ẋ = f(x,u)'
-    }
-  };
+<header class="topbar">
+  <div class="topbar-inner">
+    <div class="brand">
+      <span class="brand-mark">◈</span>
+      <div class="brand-text">
+        <span class="brand-title">Laboratorio de Control</span>
+        <span class="brand-sub">Linealización · Sistemas de 2º orden · Diagramas de bloques</span>
+      </div>
+    </div>
+    <nav class="channels" role="tablist" aria-label="Secciones">
+      <button class="channel-btn active" data-target="panel-lin" role="tab" aria-selected="true">
+        <span class="channel-tag">CH·1</span> Linealización
+      </button>
+      <button class="channel-btn" data-target="panel-2nd" role="tab" aria-selected="false">
+        <span class="channel-tag">CH·2</span> Segundo orden
+      </button>
+      <button class="channel-btn" data-target="panel-mason" role="tab" aria-selected="false">
+        <span class="channel-tag">CH·3</span> Mason
+      </button>
+    </nav>
+  </div>
+</header>
 
-  const el = (id) => document.getElementById(id);
-  const presetSel = el('lin-preset');
-  const customWrap = el('lin-custom-wrap');
-  const customInput = el('lin-custom-fn');
-  const uWrap = el('lin-u-wrap');
-  const uSlider = el('lin-u');
-  const windowSlider = el('lin-window');
-  const eqSelect = el('lin-equilibria');
-  const xminInput = el('lin-xmin');
-  const xmaxInput = el('lin-xmax');
+<main>
 
-  const canvas = el('lin-canvas');
-  const plot = new CartesianPlot(canvas);
+<!-- ===================== SECTION 1 — LINEARIZATION ===================== -->
+<section id="panel-lin" class="panel active">
+  <div class="panel-head">
+    <h1>Linealización alrededor de un punto de operación</h1>
+    <p class="lede">Toda la teoría de Laplace exige sistemas LTI. Cuando <span class="mono">ẋ = f(x, u)</span> es no lineal,
+    la aproximamos por su recta tangente en un punto de operación <span class="mono">(x̄, ū)</span>: la serie de Taylor truncada
+    en el término lineal. Elige un sistema, mueve el punto de operación y observa cómo la aproximación se aleja de la curva real
+    a medida que te alejas de <span class="mono">x̄</span>.</p>
+  </div>
 
-  let state = Object.assign({}, PRESETS.eq1a);
-  let compiledF = null, compiledDfdx = null, compiledDfdu = null;
-  let equilibria = [];
-  let selectedEq = null; // valor x̄ actualmente seleccionado
+  <div class="rack">
+    <div class="control-panel">
+      <div class="control-group">
+        <label class="control-label">Sistema</label>
+        <select id="lin-preset" class="dial-select">
+          <option value="eq1a">Ejercicio 1a — ẋ = −x + 2√x + u (ū=0)</option>
+          <option value="bistable">Sistema biestable — ẋ = x − x³ (3 equilibrios)</option>
+          <option value="reactor">Reactor CSTR — ẋ = −k·x² + (u/V)(c−x)</option>
+          <option value="tank">Tanque por gravedad — ḣ = (q − c√h)/A</option>
+          <option value="custom">Función personalizada f(x, u)</option>
+        </select>
+      </div>
 
-  function compile() {
-    try {
-      const node = math.parse(state.expr);
-      compiledF = node.compile();
-      compiledDfdx = math.derivative(node, 'x').compile();
-      try {
-        compiledDfdu = math.derivative(node, 'u').compile();
-      } catch (e) {
-        compiledDfdu = { evaluate: () => 0 };
-      }
-      try {
-        MathFmt.render(el('lin-fx-tex'), `f(x,u) = ${node.toTex()}`, true);
-      } catch (e) { /* ignore tex conversion issues */ }
-      return true;
-    } catch (e) {
-      compiledF = null;
-      return false;
-    }
-  }
+      <div class="control-group" id="lin-custom-wrap" style="display:none">
+        <label class="control-label">f(x, u) =</label>
+        <input id="lin-custom-fn" class="dial-input mono" type="text" value="x*sqrt(x^2+5*x)" spellcheck="false">
+        <p class="hint">Usa <span class="mono">x</span> y opcionalmente <span class="mono">u</span>. Sintaxis tipo MATLAB: <span class="mono">^ * / + - sqrt() sin() exp()</span></p>
+      </div>
 
-  function renderTaylorFormula() {
-    MathFmt.render(el('lin-taylor-formula'),
-      `f(x) \\approx f(\\bar{x}) + \\left.\\frac{\\partial f}{\\partial x}\\right|_{\\bar{x}}\\big(x-\\bar{x}\\big) \\;=\\; f(\\bar{x}) + \\left.\\frac{\\partial f}{\\partial x}\\right|_{\\bar{x}}\\hat{x}(t)`,
-      true);
-  }
+      <div class="control-group">
+        <div class="control-label-row">
+          <label class="control-label">Amplitud del rango de x</label>
+          <span class="readout mono" id="lin-range-readout">×1.0</span>
+        </div>
+        <input id="lin-range-scale" type="range" min="0.3" max="6" step="0.1" value="1" class="slider">
+        <p class="hint">Mostrando x ∈ [<span class="mono" id="lin-range-values">0.00, 12.00</span>]. Amplíalo si tu función necesita verse en una escala mayor; los equilibrios se buscan dentro de este rango.</p>
+      </div>
 
-  function f(x, u) {
-    try { const v = compiledF.evaluate({ x, u }); return typeof v === 'number' ? v : NaN; }
-    catch (e) { return NaN; }
-  }
-  function dfdx(x, u) {
-    try { const v = compiledDfdx.evaluate({ x, u }); return typeof v === 'number' ? v : NaN; }
-    catch (e) { return NaN; }
-  }
-  function dfdu(x, u) {
-    try { const v = compiledDfdu.evaluate({ x, u }); return typeof v === 'number' ? v : 0; }
-    catch (e) { return 0; }
-  }
+      <div class="control-group">
+        <div class="control-label-row">
+          <label class="control-label">Punto de equilibrio x̄</label>
+          <span class="readout mono" id="lin-xbar-readout">5.00</span>
+        </div>
+        <select id="lin-equilibria" class="dial-select"></select>
+        <p class="hint">Solo se puede linealizar <strong>en los puntos de equilibrio</strong> (donde f(x̄, ū) = 0). Se recalculan automáticamente al cambiar u o el rango. También puedes hacer clic sobre uno de los marcadores ⊙ de la curva.</p>
+      </div>
 
-  // Busca todos los ceros de f(x,u)=0 en xRange: barrido + detección de cambio de signo + bisección.
-  function findEquilibria(u, xRange) {
-    if (!compiledF) return [];
-    const [x0, x1] = xRange;
-    const N = 800;
-    const xs = new Array(N + 1), ys = new Array(N + 1);
-    for (let i = 0; i <= N; i++) {
-      xs[i] = x0 + (x1 - x0) * i / N;
-      ys[i] = f(xs[i], u);
-    }
-    const roots = [];
-    for (let i = 0; i <= N; i++) {
-      if (isFinite(ys[i]) && Math.abs(ys[i]) < 1e-7) roots.push(xs[i]);
-    }
-    for (let i = 1; i <= N; i++) {
-      const a = ys[i - 1], b = ys[i];
-      if (!isFinite(a) || !isFinite(b)) continue;
-      if (a * b < 0) {
-        let lo = xs[i - 1], hi = xs[i], flo = a;
-        for (let k = 0; k < 50; k++) {
-          const mid = (lo + hi) / 2, fm = f(mid, u);
-          if (!isFinite(fm)) break;
-          if (Math.abs(fm) < 1e-12) { lo = hi = mid; break; }
-          if ((flo < 0) === (fm < 0)) { lo = mid; flo = fm; } else { hi = mid; }
-        }
-        roots.push((lo + hi) / 2);
-      }
-    }
-    const eps = (x1 - x0) * 0.008;
-    const sorted = roots.sort((a, b) => a - b);
-    const deduped = [];
-    sorted.forEach((r) => {
-      if (!deduped.length || Math.abs(r - deduped[deduped.length - 1]) > eps) deduped.push(r);
-    });
-    return deduped;
-  }
+      <div class="control-group" id="lin-u-wrap">
+        <div class="control-label-row">
+          <label class="control-label">Parámetro / entrada u</label>
+          <span class="readout mono" id="lin-u-readout">1.00</span>
+        </div>
+        <input id="lin-u" type="range" min="0" max="5" step="0.05" value="1" class="slider">
+      </div>
 
-  function refreshEquilibriaSelect(preferredValue) {
-    const u = parseFloat(uSlider.value);
-    equilibria = findEquilibria(u, state.xRange);
-    eqSelect.innerHTML = '';
-    equilibria.forEach((eqVal, i) => {
-      const opt = document.createElement('option');
-      opt.value = String(i);
-      opt.textContent = `x̄ = ${eqVal.toFixed(4)}`;
-      eqSelect.appendChild(opt);
-    });
-    if (equilibria.length === 0) {
-      const opt = document.createElement('option');
-      opt.textContent = 'Sin equilibrios en el rango mostrado';
-      eqSelect.appendChild(opt);
-      selectedEq = null;
-      return;
-    }
-    // preservar el equilibrio más parecido al anterior (para continuidad al mover u)
-    let idx = 0;
-    if (preferredValue != null) {
-      let best = Infinity;
-      equilibria.forEach((v, i) => {
-        const d = Math.abs(v - preferredValue);
-        if (d < best) { best = d; idx = i; }
-      });
-    }
-    eqSelect.value = String(idx);
-    selectedEq = equilibria[idx];
-  }
+      <div class="control-group">
+        <div class="control-label-row">
+          <label class="control-label">Ventana de análisis (± Δx)</label>
+          <span class="readout mono" id="lin-window-readout">3.0</span>
+        </div>
+        <input id="lin-window" type="range" min="0.2" max="6" step="0.1" value="3" class="slider">
+      </div>
 
-  function applyPreset(name) {
-    const p = PRESETS[name];
-    state = Object.assign({}, p);
-    customWrap.style.display = name === 'custom' ? 'flex' : 'none';
-    uWrap.style.display = p.uRange ? 'flex' : 'none';
-    if (name === 'custom') state.expr = customInput.value;
+      <div class="readout-block">
+        <div class="readout-row"><span>∂f/∂x |x̄</span><span class="mono" id="lin-dfdx">—</span></div>
+        <div class="readout-row"><span>∂f/∂u |x̄</span><span class="mono" id="lin-dfdu">—</span></div>
+        <div class="readout-row"><span>f(x̄)</span><span class="mono" id="lin-fxbar">—</span></div>
+        <div class="readout-row"><span>Estabilidad local</span><span class="mono" id="lin-stability">—</span></div>
+        <div class="readout-row"><span>Error relativo máx. en la ventana</span><span class="mono" id="lin-error">—</span></div>
+      </div>
 
-    xminInput.value = p.xRange[0];
-    xmaxInput.value = p.xRange[1];
+      <div class="equation-card">
+        <div class="equation-title">Sistema linealizado</div>
+        <div class="equation" id="lin-equation"></div>
+      </div>
+    </div>
 
-    if (p.uRange) {
-      uSlider.min = p.uRange[0]; uSlider.max = p.uRange[1]; uSlider.value = p.u;
-    } else {
-      uSlider.value = p.u;
-    }
-    compile();
-    refreshEquilibriaSelect(null);
-    render();
-  }
+    <div class="scope-stack">
+      <div class="scope">
+        <div class="scope-head">
+          <span class="scope-title">f(x) vs. x — no lineal (ámbar) y linealizado (cian)</span>
+          <span class="scope-legend">
+            <span class="legend-dot amber"></span> f(x)
+            <span class="legend-dot cyan"></span> Tangente en x̄
+            <span class="legend-dot cyan"></span> Equilibrio seleccionado (x̄, f(x̄))
+            <span class="legend-dot grey"></span> Otros equilibrios
+          </span>
+        </div>
+        <canvas id="lin-canvas" class="scope-canvas"></canvas>
+      </div>
 
-  function applyRangeFromInputs() {
-    let xmin = parseFloat(xminInput.value), xmax = parseFloat(xmaxInput.value);
-    if (!isFinite(xmin) || !isFinite(xmax) || xmax <= xmin) return;
-    state.xRange = [xmin, xmax];
-    refreshEquilibriaSelect(selectedEq);
-    render();
-  }
+      <div class="results-panel">
+        <div class="equation-card">
+          <div class="equation-title">Función ingresada</div>
+          <div class="equation" id="lin-fx-tex"></div>
+        </div>
+        <div class="equation-card">
+          <div class="equation-title">Expansión de Taylor de primer orden alrededor de x̄ (Ec. 3.6)</div>
+          <div class="equation" id="lin-taylor-formula"></div>
+        </div>
+      </div>
+    </div>
+  </div>
+</section>
 
-  function render() {
-    const u = parseFloat(uSlider.value);
-    const win = parseFloat(windowSlider.value);
-    el('lin-u-readout').textContent = u.toFixed(2);
-    el('lin-window-readout').textContent = win.toFixed(1);
+<!-- ===================== SECTION 2 — SECOND ORDER ===================== -->
+<section id="panel-2nd" class="panel">
+  <div class="panel-head">
+    <h1>Sistemas de segundo orden</h1>
+    <p class="lede">Toda función de transferencia de segundo orden puede llevarse a la forma estándar
+    <span class="mono">T(s) = K·ωₙ² / (s² + 2ζωₙs + ωₙ²)</span>. Mueve los controles y observa cómo
+    <span class="mono">ζ</span> y <span class="mono">ωₙ</span> mueven los polos en el plano-s y deforman la respuesta al escalón.</p>
+  </div>
 
-    if (!compiledF) { compile(); }
-    if (!compiledF) return;
+  <div class="rack">
+    <div class="control-panel">
+      <div class="control-group">
+        <label class="control-label">Sistemas de referencia (Ejercicios de repaso)</label>
+        <div class="preset-row">
+          <button class="chip-btn" data-k="2" data-z="0.6" data-w="5">T₁ subamortiguado</button>
+          <button class="chip-btn" data-k="1" data-z="0" data-w="4">T₂ no amortiguado</button>
+          <button class="chip-btn" data-k="1" data-z="1" data-w="3">T₃ crítico</button>
+          <button class="chip-btn" data-k="1" data-z="1.5" data-w="10">T₄ sobreamortiguado</button>
+        </div>
+      </div>
 
-    const [xr0, xr1] = state.xRange;
-    const pad = (xr1 - xr0) * 0.06;
+      <div class="control-group">
+        <div class="control-label-row"><label class="control-label">Ganancia K</label><span class="readout mono" id="so-k-readout">1.00</span></div>
+        <input id="so-k" type="range" min="0.1" max="5" step="0.05" value="1" class="slider">
+      </div>
+      <div class="control-group">
+        <div class="control-label-row"><label class="control-label">Amortiguamiento ζ</label><span class="readout mono" id="so-z-readout">0.45</span></div>
+        <input id="so-z" type="range" min="0" max="2" step="0.01" value="0.45" class="slider">
+      </div>
+      <div class="control-group">
+        <div class="control-label-row"><label class="control-label">Frecuencia natural ωₙ</label><span class="readout mono" id="so-w-readout">4.00</span></div>
+        <input id="so-w" type="range" min="0.5" max="30" step="0.1" value="4" class="slider">
+      </div>
 
-    // muestreo de f(x,u) para graficar y para acotar el eje y — SIEMPRE, haya o no equilibrio
-    const N = 260;
-    const curve = [];
-    let ymin = Infinity, ymax = -Infinity;
-    for (let i = 0; i <= N; i++) {
-      const x = xr0 - pad + (xr1 - xr0 + 2 * pad) * i / N;
-      const y = f(x, u);
-      curve.push([x, y]);
-      if (isFinite(y)) { ymin = Math.min(ymin, y); ymax = Math.max(ymax, y); }
-    }
-    if (!isFinite(ymin) || !isFinite(ymax)) { ymin = -1; ymax = 1; }
-    const ypad = (ymax - ymin) * 0.12 || 1;
-    plot.setBounds(xr0 - pad, xr1 + pad, ymin - ypad, ymax + ypad);
+      <div class="control-group toggles">
+        <label class="check"><input type="checkbox" id="so-show-envelope" checked> Envolventes 1 ± e<sup>−ζωₙt</sup>/√(1−ζ²)</label>
+        <label class="check"><input type="checkbox" id="so-show-zeta-line" checked> Línea radial de ζ constante</label>
+        <label class="check"><input type="checkbox" id="so-show-wn-circle" checked> Círculo de ωₙ constante</label>
+        <label class="check"><input type="checkbox" id="so-show-sigma-line" checked> Línea vertical de tₛ constante</label>
+      </div>
 
-    if (selectedEq == null || equilibria.length === 0) {
-      const drawCurveOnly = () => {
-        plot.clear();
-        plot.drawAxes(state.xLabel, state.yLabel);
-        plot.plotLine(curve, '#F2A93C', { width: 2.2 });
-      };
-      plot.redrawOn(drawCurveOnly);
-      drawCurveOnly();
+      <div class="equation-card">
+        <div class="equation-title">Función de transferencia</div>
+        <div class="equation" id="so-equation"></div>
+      </div>
 
-      el('lin-xbar-readout').textContent = '—';
-      el('lin-dfdx').textContent = '—';
-      el('lin-dfdu').textContent = '—';
-      el('lin-fxbar').textContent = '—';
-      el('lin-stability').textContent = '—';
-      el('lin-error').textContent = '—';
-      MathFmt.render(el('lin-equation'), `\\text{Sin punto de equilibrio en este rango: } f(x,\\bar{u}) \\neq 0`, true);
-      return;
-    }
+      <div class="readout-block" id="so-case-block">
+        <div class="readout-row"><span>Caso</span><span class="mono" id="so-case">—</span></div>
+        <div class="readout-row"><span>Polos</span><span class="mono" id="so-poles">—</span></div>
+        <div class="readout-row"><span>tᵣ (10–90%)</span><span class="mono" id="so-tr">—</span></div>
+        <div class="readout-row"><span>t_p (pico)</span><span class="mono" id="so-tp">—</span></div>
+        <div class="readout-row"><span>MP (%)</span><span class="mono" id="so-mp">—</span></div>
+        <div class="readout-row"><span>tₛ (2% / 5%)</span><span class="mono" id="so-ts">—</span></div>
+        <div class="readout-row"><span>Ganancia DC</span><span class="mono" id="so-dc">—</span></div>
+      </div>
+    </div>
 
-    const xbar = selectedEq;
-    el('lin-xbar-readout').textContent = xbar.toFixed(4);
+    <div class="scope-stack">
+      <div class="scope">
+        <div class="scope-head">
+          <span class="scope-title">Respuesta a escalón unitario y(t)</span>
+          <span class="scope-legend">
+            <span class="legend-dot amber"></span> y(t)
+            <span class="legend-dot cyan"></span> Envolvente
+            <span class="legend-dot rose"></span> t_p
+          </span>
+        </div>
+        <canvas id="so-step-canvas" class="scope-canvas"></canvas>
+      </div>
+      <div class="scope">
+        <div class="scope-head">
+          <span class="scope-title">Plano-s — ubicación de los polos</span>
+          <span class="scope-legend">
+            <span class="legend-dot amber"></span> Polos
+            <span class="legend-dot cyan"></span> ωₙ, ζ
+            <span class="legend-dot rose"></span> tₛ
+          </span>
+        </div>
+        <canvas id="so-pz-canvas" class="scope-canvas short"></canvas>
+      </div>
 
-    const slope = dfdx(xbar, u);
-    const fxbar = f(xbar, u);
-    const dU = dfdu(xbar, u);
+      <div class="results-panel" id="so-formula-panel">
+        <p class="hint">Calculando…</p>
+      </div>
+    </div>
+  </div>
+</section>
 
-    if (!isFinite(slope)) {
-      const drawSingular = () => {
-        plot.clear();
-        plot.drawAxes(state.xLabel, state.yLabel);
-        plot.plotLine(curve, '#F2A93C', { width: 2.2 });
-        equilibria.forEach((eqVal) => {
-          plot.plotMarker(eqVal, f(eqVal, u), Math.abs(eqVal - xbar) < 1e-9 ? '#E8607A' : '#9CA3CC',
-            Math.abs(eqVal - xbar) < 1e-9 ? 'dot' : 'ring', 5.5);
-        });
-      };
-      plot.redrawOn(drawSingular);
-      drawSingular();
-      el('lin-dfdx').textContent = '∂f/∂x → ∞';
-      el('lin-dfdu').textContent = '—';
-      el('lin-fxbar').textContent = isFinite(fxbar) ? fxbar.toFixed(4) : '—';
-      el('lin-stability').textContent = 'No linealizable (derivada no acotada)';
-      el('lin-error').textContent = '—';
-      MathFmt.render(el('lin-equation'),
-        `\\text{La derivada diverge en } \\bar{x}=${xbar.toFixed(3)} \\text{ (frontera singular del dominio).}`,
-        true);
-      return;
-    }
+<!-- ===================== SECTION 3 — MASON ===================== -->
+<section id="panel-mason" class="panel">
+  <div class="panel-head">
+    <h1>Diagramas de bloques y ley de Mason</h1>
+    <p class="lede">Construye el diagrama de bloques directamente: describe cada bloque como
+    <span class="mono">de señal → a señal, con ganancia</span> (p. ej. <span class="mono">R → E, ganancia 1</span>,
+    luego <span class="mono">E → Y, ganancia G</span>). Las señales (los círculos) se crean solas cuando las nombras.
+    El programa arma el diagrama de flujo de señal equivalente automáticamente y aplica la ley de Mason.</p>
+  </div>
 
-    // recta tangente sobre la ventana de análisis
-    const tangent = [];
-    const lo = Math.max(xr0 - pad, xbar - win), hi = Math.min(xr1 + pad, xbar + win);
-    for (let i = 0; i <= 40; i++) {
-      const x = lo + (hi - lo) * i / 40;
-      const y = fxbar + slope * (x - xbar);
-      tangent.push([x, y]);
-    }
+  <div class="rack rack-mason">
+    <div class="control-panel">
+      <div class="control-group">
+        <label class="control-label">Ejemplos del capítulo</label>
+        <div class="preset-row column">
+          <button class="chip-btn wide" id="mason-preset-series">Serie G₁·G₂ — Fig. 3.15</button>
+          <button class="chip-btn wide" id="mason-preset-feedback">Retroalimentación G, H — Fig. 3.16</button>
+          <button class="chip-btn wide" id="mason-preset-fig320">Figura 3.20 — 9 nodos, 4 lazos</button>
+          <button class="chip-btn wide" id="mason-preset-clear">Vaciar lienzo</button>
+        </div>
+      </div>
 
-    const draw = () => {
-      plot.clear();
-      plot.drawAxes(state.xLabel, state.yLabel);
-      plot.plotLine(curve, '#F2A93C', { width: 2.2 });
-      plot.plotLine(tangent, '#57D6C7', { width: 2.4 });
+      <div class="control-group">
+        <label class="control-label">Agregar bloque</label>
+        <p class="hint">Escribe el nombre de la señal de entrada y de salida del bloque. Si el nombre no existe
+        todavía, se crea automáticamente — no hay que declarar señales por separado.</p>
+        <div class="inline-row">
+          <input id="mason-block-from" class="dial-input mono small" type="text" placeholder="de: R" value="">
+          <span class="arrow-glyph">→</span>
+          <input id="mason-block-to" class="dial-input mono small" type="text" placeholder="a: Y" value="">
+        </div>
+        <input id="mason-block-gain" class="dial-input mono" type="text" placeholder="ganancia, p. ej. G o -H" value="G">
+        <button id="mason-add-block" class="tool-btn full">+ Agregar bloque</button>
+      </div>
 
-      // marcar TODOS los equilibrios detectados (anillo tenue), y resaltar el seleccionado
-      equilibria.forEach((eqVal) => {
-        if (Math.abs(eqVal - xbar) < 1e-9) return;
-        plot.plotMarker(eqVal, f(eqVal, u), '#9CA3CC', 'ring', 5);
-      });
-      plot.plotMarker(xbar, fxbar, '#57D6C7', 'dot', 5.5);
+      <div class="control-group">
+        <label class="control-label">Entrada / salida del sistema</label>
+        <div class="inline-row">
+          <select id="mason-source" class="dial-select small"></select>
+          <span class="arrow-glyph">⇢</span>
+          <select id="mason-sink" class="dial-select small"></select>
+        </div>
+      </div>
 
-      // ventana de análisis (guías verticales punteadas)
-      const ctx = plot.ctx;
-      [lo, hi].forEach((xv) => {
-        const [px] = plot.toPx(xv, 0);
-        ctx.save();
-        ctx.strokeStyle = 'rgba(232,96,122,0.5)';
-        ctx.setLineDash([3, 4]);
-        ctx.beginPath();
-        ctx.moveTo(px, plot.padding.top);
-        ctx.lineTo(px, plot.h - plot.padding.bottom);
-        ctx.stroke();
-        ctx.restore();
-      });
-    };
-    plot.redrawOn(draw);
-    draw();
+      <div class="control-group">
+        <button id="mason-compute" class="tool-btn full primary">Calcular con la ley de Mason</button>
+      </div>
 
-    // error relativo máximo de la aproximación dentro de la ventana
-    let maxRelErr = 0;
-    for (let i = 0; i <= 60; i++) {
-      const x = lo + (hi - lo) * i / 60;
-      const yTrue = f(x, u);
-      const yLin = fxbar + slope * (x - xbar);
-      if (Math.abs(yTrue) > 1e-6) {
-        const err = Math.abs((yTrue - yLin) / yTrue);
-        if (isFinite(err)) maxRelErr = Math.max(maxRelErr, err);
-      }
-    }
+      <div class="control-group">
+        <label class="control-label">Bloques actuales</label>
+        <div id="mason-edge-list" class="mini-list"></div>
+      </div>
+      <div class="control-group">
+        <label class="control-label">Señales actuales</label>
+        <div id="mason-node-list" class="mini-list"></div>
+      </div>
+      <p class="hint">Arrastra los círculos o los puntos ◇ sobre las curvas para acomodar el diagrama a tu gusto.</p>
+    </div>
 
-    el('lin-dfdx').textContent = isFinite(slope) ? slope.toFixed(4) : '—';
-    el('lin-dfdu').textContent = state.uRange ? (isFinite(dU) ? dU.toFixed(4) : '—') : 'n/a';
-    el('lin-fxbar').textContent = isFinite(fxbar) ? fxbar.toFixed(4) : '—';
-    el('lin-error').textContent = isFinite(maxRelErr) ? (maxRelErr * 100).toFixed(1) + ' %' : '—';
+    <div class="scope-stack">
+      <div class="scope">
+        <div class="scope-head">
+          <span class="scope-title">Diagrama de bloques (edítalo aquí)</span>
+        </div>
+        <svg id="mason-block-svg" class="scope-svg" viewBox="0 0 900 460"></svg>
+      </div>
+      <div class="scope">
+        <div class="scope-head">
+          <span class="scope-title">Diagrama de flujo de señal — generado automáticamente</span>
+        </div>
+        <svg id="mason-node-svg" class="scope-svg readonly" viewBox="0 0 900 460"></svg>
+      </div>
+      <div class="results-panel" id="mason-results">
+        <p class="hint">Construye el diagrama y presiona <span class="mono">Calcular</span> para ver trayectos, lazos y T(s).</p>
+      </div>
+    </div>
+  </div>
+</section>
 
-    let stabilityText = '—';
-    if (isFinite(slope)) {
-      if (slope < -1e-6) stabilityText = 'Estable (∂f/∂x < 0)';
-      else if (slope > 1e-6) stabilityText = 'Inestable (∂f/∂x > 0)';
-      else stabilityText = 'Marginal (∂f/∂x ≈ 0)';
-    }
-    el('lin-stability').textContent = stabilityText;
+</main>
 
-    const term2 = state.uRange && Math.abs(dU) > 1e-9
-      ? ` + (${dU.toFixed(3)})\\,\\hat{u}(t)` : '';
-    MathFmt.render(el('lin-equation'),
-      `\\dot{\\hat{x}}(t) \\approx (${slope.toFixed(3)})\\,\\hat{x}(t)${term2}`,
-      true);
-  }
+<footer class="foot">
+  <span>Basado en las Notas de Análisis de Sistemas de Control — Universidad de los Andes, Cap. 3</span>
+</footer>
 
-  presetSel.addEventListener('change', () => applyPreset(presetSel.value));
-  customInput.addEventListener('input', () => {
-    state.expr = customInput.value;
-    if (compile()) { refreshEquilibriaSelect(null); render(); }
-  });
-  xminInput.addEventListener('change', applyRangeFromInputs);
-  xmaxInput.addEventListener('change', applyRangeFromInputs);
-  uSlider.addEventListener('input', () => {
-    refreshEquilibriaSelect(selectedEq);
-    render();
-  });
-  windowSlider.addEventListener('input', render);
-  eqSelect.addEventListener('change', () => {
-    const idx = parseInt(eqSelect.value, 10);
-    if (!isNaN(idx) && equilibria[idx] != null) selectedEq = equilibria[idx];
-    render();
-  });
-
-  // clic sobre la curva = seleccionar el equilibrio más cercano (no cualquier punto libre)
-  plot.onClick((x) => {
-    if (!equilibria.length) return;
-    let bestIdx = 0, bestDist = Infinity;
-    equilibria.forEach((eqVal, i) => {
-      const d = Math.abs(eqVal - x);
-      if (d < bestDist) { bestDist = d; bestIdx = i; }
-    });
-    eqSelect.value = String(bestIdx);
-    selectedEq = equilibria[bestIdx];
-    render();
-  });
-
-  window.addEventListener('DOMContentLoaded', () => {
-    renderTaylorFormula();
-    applyPreset('eq1a');
-  });
-  window.__linRender = render;
-})();
+<script src="https://cdnjs.cloudflare.com/ajax/libs/mathjs/12.4.1/math.min.js"></script>
+<script src="https://cdnjs.cloudflare.com/ajax/libs/KaTeX/0.16.9/katex.min.js"></script>
+<script src="js/plot.js"></script>
+<script src="js/mathfmt.js"></script>
+<script src="js/linearization.js"></script>
+<script src="js/secondorder.js"></script>
+<script src="js/mason.js"></script>
+<script src="js/app.js"></script>
+</body>
+</html>
