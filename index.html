@@ -76,6 +76,15 @@
 
       <div class="control-group">
         <div class="control-label-row">
+          <label class="control-label">Amplitud del rango de y</label>
+          <span class="readout mono" id="lin-yrange-readout">×1.0</span>
+        </div>
+        <input id="lin-yrange-scale" type="range" min="0.2" max="4" step="0.1" value="1" class="slider">
+        <p class="hint">Rango vertical mostrado: [<span class="mono" id="lin-yrange-values">-1.00, 1.00</span>].</p>
+      </div>
+
+      <div class="control-group">
+        <div class="control-label-row">
           <label class="control-label">Punto de equilibrio x̄</label>
           <span class="readout mono" id="lin-xbar-readout">5.00</span>
         </div>
@@ -180,6 +189,21 @@
         <label class="check"><input type="checkbox" id="so-show-zeta-line" checked> Línea radial de ζ constante</label>
         <label class="check"><input type="checkbox" id="so-show-wn-circle" checked> Círculo de ωₙ constante</label>
         <label class="check"><input type="checkbox" id="so-show-sigma-line" checked> Línea vertical de tₛ constante</label>
+      </div>
+
+      <div class="control-group">
+        <div class="control-label-row">
+          <label class="control-label">Amplitud del eje y — escalón</label>
+          <span class="readout mono" id="so-step-yscale-readout">×1.0</span>
+        </div>
+        <input id="so-step-yscale" type="range" min="0.2" max="4" step="0.1" value="1" class="slider">
+      </div>
+      <div class="control-group">
+        <div class="control-label-row">
+          <label class="control-label">Amplitud del plano-s</label>
+          <span class="readout mono" id="so-pz-scale-readout">×1.0</span>
+        </div>
+        <input id="so-pz-scale" type="range" min="0.2" max="4" step="0.1" value="1" class="slider">
       </div>
 
       <div class="equation-card">
