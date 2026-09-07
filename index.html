@@ -66,12 +66,22 @@
       </div>
 
       <div class="control-group">
+        <label class="control-label">Rango de x mostrado</label>
+        <div class="inline-row">
+          <input id="lin-xmin" class="dial-input mono small" type="number" step="0.5" value="0">
+          <span class="arrow-glyph">a</span>
+          <input id="lin-xmax" class="dial-input mono small" type="number" step="0.5" value="12">
+        </div>
+        <p class="hint">Amplíalo si tu función necesita verse en una escala mayor. Los equilibrios se buscan dentro de este rango.</p>
+      </div>
+
+      <div class="control-group">
         <div class="control-label-row">
           <label class="control-label">Punto de equilibrio x̄</label>
           <span class="readout mono" id="lin-xbar-readout">5.00</span>
         </div>
         <select id="lin-equilibria" class="dial-select"></select>
-        <p class="hint">Solo se puede linealizar <strong>en los puntos de equilibrio</strong> (donde f(x̄, ū) = 0). Se recalculan automáticamente al cambiar u. También puedes hacer clic sobre uno de los marcadores ⊙ de la curva.</p>
+        <p class="hint">Solo se puede linealizar <strong>en los puntos de equilibrio</strong> (donde f(x̄, ū) = 0). Se recalculan automáticamente al cambiar u o el rango. También puedes hacer clic sobre uno de los marcadores ⊙ de la curva.</p>
       </div>
 
       <div class="control-group" id="lin-u-wrap">
@@ -111,6 +121,8 @@
           <span class="scope-legend">
             <span class="legend-dot amber"></span> f(x)
             <span class="legend-dot cyan"></span> Tangente en x̄
+            <span class="legend-dot cyan"></span> Equilibrio seleccionado (x̄, f(x̄))
+            <span class="legend-dot grey"></span> Otros equilibrios
           </span>
         </div>
         <canvas id="lin-canvas" class="scope-canvas"></canvas>
