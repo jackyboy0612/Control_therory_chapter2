@@ -48,6 +48,8 @@
   const uSlider = el('lin-u');
   const windowSlider = el('lin-window');
   const eqSelect = el('lin-equilibria');
+  const xminInput = el('lin-xmin');
+  const xmaxInput = el('lin-xmax');
 
   const canvas = el('lin-canvas');
   const plot = new CartesianPlot(canvas);
@@ -170,6 +172,9 @@
     uWrap.style.display = p.uRange ? 'flex' : 'none';
     if (name === 'custom') state.expr = customInput.value;
 
+    xminInput.value = p.xRange[0];
+    xmaxInput.value = p.xRange[1];
+
     if (p.uRange) {
       uSlider.min = p.uRange[0]; uSlider.max = p.uRange[1]; uSlider.value = p.u;
     } else {
@@ -177,6 +182,14 @@
     }
     compile();
     refreshEquilibriaSelect(null);
+    render();
+  }
+
+  function applyRangeFromInputs() {
+    let xmin = parseFloat(xminInput.value), xmax = parseFloat(xmaxInput.value);
+    if (!isFinite(xmin) || !isFinite(xmax) || xmax <= xmin) return;
+    state.xRange = [xmin, xmax];
+    refreshEquilibriaSelect(selectedEq);
     render();
   }
 
@@ -189,24 +202,10 @@
     if (!compiledF) { compile(); }
     if (!compiledF) return;
 
-    if (selectedEq == null || equilibria.length === 0) {
-      el('lin-xbar-readout').textContent = '—';
-      el('lin-dfdx').textContent = '—';
-      el('lin-dfdu').textContent = '—';
-      el('lin-fxbar').textContent = '—';
-      el('lin-stability').textContent = '—';
-      el('lin-error').textContent = '—';
-      MathFmt.render(el('lin-equation'), `\\text{Sin punto de equilibrio en este rango}`, true);
-      return;
-    }
-
-    const xbar = selectedEq;
-    el('lin-xbar-readout').textContent = xbar.toFixed(4);
-
     const [xr0, xr1] = state.xRange;
     const pad = (xr1 - xr0) * 0.06;
 
-    // muestreo de f(x,u) para graficar y para acotar el eje y
+    // muestreo de f(x,u) para graficar y para acotar el eje y — SIEMPRE, haya o no equilibrio
     const N = 260;
     const curve = [];
     let ymin = Infinity, ymax = -Infinity;
@@ -219,6 +218,28 @@
     if (!isFinite(ymin) || !isFinite(ymax)) { ymin = -1; ymax = 1; }
     const ypad = (ymax - ymin) * 0.12 || 1;
     plot.setBounds(xr0 - pad, xr1 + pad, ymin - ypad, ymax + ypad);
+
+    if (selectedEq == null || equilibria.length === 0) {
+      const drawCurveOnly = () => {
+        plot.clear();
+        plot.drawAxes(state.xLabel, state.yLabel);
+        plot.plotLine(curve, '#F2A93C', { width: 2.2 });
+      };
+      plot.redrawOn(drawCurveOnly);
+      drawCurveOnly();
+
+      el('lin-xbar-readout').textContent = '—';
+      el('lin-dfdx').textContent = '—';
+      el('lin-dfdu').textContent = '—';
+      el('lin-fxbar').textContent = '—';
+      el('lin-stability').textContent = '—';
+      el('lin-error').textContent = '—';
+      MathFmt.render(el('lin-equation'), `\\text{Sin punto de equilibrio en este rango: } f(x,\\bar{u}) \\neq 0`, true);
+      return;
+    }
+
+    const xbar = selectedEq;
+    el('lin-xbar-readout').textContent = xbar.toFixed(4);
 
     const slope = dfdx(xbar, u);
     const fxbar = f(xbar, u);
@@ -323,6 +344,8 @@
     state.expr = customInput.value;
     if (compile()) { refreshEquilibriaSelect(null); render(); }
   });
+  xminInput.addEventListener('change', applyRangeFromInputs);
+  xmaxInput.addEventListener('change', applyRangeFromInputs);
   uSlider.addEventListener('input', () => {
     refreshEquilibriaSelect(selectedEq);
     render();
