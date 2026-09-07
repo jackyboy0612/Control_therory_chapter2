@@ -7,6 +7,8 @@
   const showZetaLine = el('so-show-zeta-line');
   const showWnCircle = el('so-show-wn-circle');
   const showSigmaLine = el('so-show-sigma-line');
+  const stepYScaleSlider = el('so-step-yscale');
+  const pzScaleSlider = el('so-pz-scale');
 
   const stepPlot = new CartesianPlot(el('so-step-canvas'));
   const pzPlot = new CartesianPlot(el('so-pz-canvas'));
@@ -135,6 +137,12 @@
     let ymax = Math.max(...yArr.filter(isFinite), yFinal) * 1.15;
     let ymin = Math.min(0, Math.min(...yArr.filter(isFinite)) * 1.1);
 
+    const stepYScale = parseFloat(stepYScaleSlider.value);
+    el('so-step-yscale-readout').textContent = `×${stepYScale.toFixed(1)}`;
+    const yCenter = (ymin + ymax) / 2;
+    const yHalf = (ymax - ymin) / 2 * stepYScale;
+    ymin = yCenter - yHalf; ymax = yCenter + yHalf;
+
     stepPlot.setBounds(0, tMax, ymin, ymax);
 
     const envelope = [];
@@ -246,7 +254,10 @@
 
     // ---- Pole-zero plot ----
     const maxPoleMag = Math.max(...m.poles.map(p => Math.hypot(p.re, p.im)), wn) * 1.3 || 1;
-    pzPlot.setBounds(-maxPoleMag, maxPoleMag * 0.35, -maxPoleMag, maxPoleMag);
+    const pzScale = parseFloat(pzScaleSlider.value);
+    el('so-pz-scale-readout').textContent = `×${pzScale.toFixed(1)}`;
+    const viewMag = maxPoleMag * pzScale;
+    pzPlot.setBounds(-viewMag, viewMag * 0.35, -viewMag, viewMag);
 
     const drawPZ = () => {
       pzPlot.clear();
@@ -257,7 +268,7 @@
       }
       if (showZetaLine.checked && zeta > 0 && zeta < 1) {
         const beta = Math.acos(zeta);
-        const L = maxPoleMag;
+        const L = viewMag;
         pzPlot.plotLine([[0, 0], [-L * Math.cos(beta), L * Math.sin(beta)]], 'rgba(242,169,60,0.5)', { width: 1.2, dash: [5, 3] });
         pzPlot.plotLine([[0, 0], [-L * Math.cos(beta), -L * Math.sin(beta)]], 'rgba(242,169,60,0.5)', { width: 1.2, dash: [5, 3] });
       }
@@ -278,7 +289,7 @@
     drawPZ();
   }
 
-  [kSlider, zSlider, wSlider, showEnvelope, showZetaLine, showWnCircle, showSigmaLine]
+  [kSlider, zSlider, wSlider, showEnvelope, showZetaLine, showWnCircle, showSigmaLine, stepYScaleSlider, pzScaleSlider]
     .forEach(inp => inp.addEventListener('input', render));
 
   document.querySelectorAll('.chip-btn[data-k]').forEach(btn => {
