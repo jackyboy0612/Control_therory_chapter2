@@ -301,11 +301,12 @@ main{ max-width: 1280px; margin: 0 auto; padding: 0 28px 60px; }
   border-bottom: 1px solid var(--border-soft);
 }
 .scope-title{ font-size: 13px; color: var(--ink-dim); }
-.scope-legend{ font-size: 12px; color: var(--ink-faint); display:flex; gap:14px; align-items:center; }
+.scope-legend{ font-size: 12px; color: var(--ink-faint); display:flex; gap:14px; align-items:center; flex-wrap: wrap; row-gap: 4px; }
 .legend-dot{ display:inline-block; width:9px; height:9px; border-radius:50%; margin-right:5px; vertical-align:middle; }
 .legend-dot.amber{ background: var(--amber); }
 .legend-dot.cyan{ background: var(--cyan); }
 .legend-dot.rose{ background: var(--rose); }
+.legend-dot.grey{ background: var(--ink-faint); }
 
 .scope-canvas{
   display:block;
